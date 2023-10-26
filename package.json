@@ -1,0 +1,21 @@
+{
+  "name": "hardhat",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "hardhat": "^2.18.2"
+  },
+  "dependencies": {
+    "@openzeppelin/contracts": "^5.0.0",
+    "@uniswap/v3-core": "github:Uniswap/v3-core#6562c52e8f75f0c10f9deaf44861847585fc8129",
+    "@uniswap/v3-periphery": "github:Uniswap/v3-periphery#b325bb0905d922ae61fcc7df85ee802e8df5e96c",
+    "dotenv": "^16.3.1"
+  }
+}
