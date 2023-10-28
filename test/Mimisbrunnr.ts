@@ -163,13 +163,24 @@ describe("Mimisbrunnr", async () => {
         )
         console.log('events', events)
         console.log('=======================')
-        console.log(await weth.balanceOf(accounts[0]))
-        console.log(await rsc.balanceOf(accounts[0]))
+        console.log('mims', await mimisbrunnr.balanceOf(accounts[0]))
+        console.log('weth', await weth.balanceOf(accounts[0]))
+        console.log('rsc', await rsc.balanceOf(accounts[0]))
         console.log('=======================')
         const approvetx5 = await nfpm.approve(await mimisbrunnr.getAddress(), events[0].args[2])
-        const deposittx = await mimisbrunnr.stakeLP(events[0].args[2])
+        await approvetx5.wait()
+        const selltx = await mimisbrunnr.sellLP(events[0].args[2])
+        await selltx.wait()
+        console.log('=======================')
+        console.log('mims', await mimisbrunnr.balanceOf(accounts[0]))
+        console.log('weth', await weth.balanceOf(accounts[0]))
+        console.log('rsc', await rsc.balanceOf(accounts[0]))
+        console.log('=======================')
 
+        
 
     })
+
+    it("")
 })
 
