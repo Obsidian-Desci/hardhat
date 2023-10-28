@@ -1,7 +1,6 @@
 import 'dotenv/config'
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.20",
@@ -15,7 +14,7 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: {
-        url: process.env.TENDERLY_FORK || ''
+        url: process.env.TENDERLY_FORK
       },
       accounts: {
         mnemonic: process.env.MNEMONIC || ''

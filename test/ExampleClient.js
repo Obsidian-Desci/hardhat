@@ -1,5 +1,5 @@
 const hre = require('hardhat')
-const {main} = require('../scripts/deploy')
+const {main} = require('../scripts/deployLilypadClient')
 
 
 describe("Example Client", async () => {

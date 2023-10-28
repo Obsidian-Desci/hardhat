@@ -7,10 +7,6 @@
 const hre = require("hardhat");
 
 async function main() {
-  //const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-  //const unlockTime = currentTimestampInSeconds + 60;
-
-  const lockedAmount = hre.ethers.parseEther("0.001");
 
   const exampleClient = await hre.ethers.deployContract(
     "ExampleClient", ['0x422F325AA109A3038BDCb7B03Dd0331A4aC2cD1a']
