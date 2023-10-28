@@ -90,7 +90,7 @@ contract Mimisbrunnr is ERC20 {
 
     PoolParams RSCWETH = PoolParams({
         pool: 0xeC2061372a02D5e416F5D8905eea64Cab2c10970,
-        fee: 3000,
+        fee: 10000,
         wethIsToken0: true,
         protocolOwnedLiquidity: 0,
         mimisPosition: 0
@@ -132,6 +132,13 @@ contract Mimisbrunnr is ERC20 {
         pools[address(this)] = MIMSWETH;
     }
 
+    function setMimisPositionForToken(address token, uint256 tokenId) public {
+        require(msg.sender == operator);
+        pools[token].mimisPosition = tokenId;
+        IERC20(token).approve(address(infpm), type(uint256).max);
+        IERC20(WETH).approve(address(infpm), type(uint256).max);
+    }
+
     function sqrtPriceX96ToUint(uint160 sqrtPriceX96, uint8 decimalsToken0)
         internal
         pure
@@ -164,7 +171,7 @@ contract Mimisbrunnr is ERC20 {
    function mergeLiquidity(
        uint256 erc721Id,
        uint256 mimisPosition,
-       uint128 liquidity,
+       uint128 liquidity
    ) internal returns (uint128 liquidityAdded){
         INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseParams =
         INonfungiblePositionManager.DecreaseLiquidityParams({
@@ -175,6 +182,9 @@ contract Mimisbrunnr is ERC20 {
             deadline: block.timestamp + 3600
         });
         (uint256 returnedAmount0 , uint256 returnedAmount1 ) = infpm.decreaseLiquidity(decreaseParams);
+        console.log('decreased');
+        console.log('returnedAmount0', returnedAmount0);
+        console.log('returnedAmount1', returnedAmount1);
         INonfungiblePositionManager.CollectParams memory collectParams =
         INonfungiblePositionManager.CollectParams({
             tokenId: erc721Id,
@@ -183,26 +193,31 @@ contract Mimisbrunnr is ERC20 {
             amount1Max: type(uint128).max
         });
         (uint256 collected0, uint256 collected1 ) = infpm.collect(collectParams);
-
+        console.log('collected');
+        console.log('collected0', collected0);
+        console.log('collected1', collected1);
         INonfungiblePositionManager.IncreaseLiquidityParams memory increaseParams =
         INonfungiblePositionManager.IncreaseLiquidityParams({
                 tokenId: mimisPosition,
-                amount0Desired: returnedAmount0 + collected0,
-                amount1Desired: returnedAmount1 + collected1,
+                amount0Desired: collected0,
+                amount1Desired: collected1,
                 amount0Min: 0,
                 amount1Min: 0,
                 deadline: block.timestamp + 3600
         });
         (liquidityAdded, ,) = infpm.increaseLiquidity(increaseParams);
+        console.log('increased');
    }
 
+   //event Tick (int24 indexed tickLower, int24 tickUpper);
     function sellLP(
         uint256 erc721Id
     ) public {
         (, , address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, , , , ) = infpm.positions(erc721Id);
         // Ensure to Require minimum and maximum tick
-        require(tickLower == TickMath.MIN_TICK, "Mimisbrunnr doesnt support concentrated liquidity");
-        require(tickUpper == TickMath.MAX_TICK, "Mimisbrunnr doesnt support concentrated liquidity");
+        //emit Tick(tickLower, tickUpper);
+        require(tickLower <= int24(-887200) , "Mimisbrunnr doesnt support concentrated liquidity");
+        require(tickUpper >= int24(887200), "Mimisbrunnr doesnt support concentrated liquidity");
         address owner = infpm.ownerOf(erc721Id);
         require(owner == msg.sender, "must be owner of nft");
         require(liquidity > 0, "must have a liquidity greater than zero");
@@ -216,7 +231,7 @@ contract Mimisbrunnr is ERC20 {
         uint128 liquidityAdded = mergeLiquidity(
             erc721Id,
             poolParams.mimisPosition,
-            liquidity,
+            liquidity
         );
         deposits[msg.sender][address(pool)] += liquidityAdded;
         pools[poolParams.pool].protocolOwnedLiquidity += liquidityAdded;
@@ -232,9 +247,28 @@ contract Mimisbrunnr is ERC20 {
        for (uint i =0; i< poolAddrs.length; i++) {
            PoolParams memory poolParams = pools[poolAddrs[i]];
            IUniswapV3Pool pool = IUniswapV3Pool(poolParams.pool);
+            INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseParams =
+            INonfungiblePositionManager.DecreaseLiquidityParams({
+                tokenId: poolParams.mimisPosition,
+                liquidity: (uint128(amount) * ((poolParams.protocolOwnedLiquidity * 1e27) / totalProtocolOwnedLiquidity)) / 1e27,
+                amount0Min: 0,
+                amount1Min: 0,
+                deadline: block.timestamp + 3600
+            });
+            (uint256 amount0, uint256 amount1) = infpm.decreaseLiquidity(decreaseParams);
+            (poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, amount0));
+            (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, amount1));
 
-
+            INonfungiblePositionManager.CollectParams memory collectParams =
+            INonfungiblePositionManager.CollectParams({
+                tokenId: poolParams.mimisPosition,
+                recipient: address(this),
+                amount0Max: type(uint128).max,
+                amount1Max: type(uint128).max
+            });
+            infpm.collect(collectParams);
        }
+
     }
     /*
     function claimReward(

@@ -109,15 +109,10 @@ describe("Mimisbrunnr", async () => {
         })
     })
 
-    it("should accept a RSC WETH Liquidity position", async () => {
+    it("should create the RSC mimis position", async () => {
         const wethAmount = hre.ethers.parseUnits('0.1', 'ether')
         const wethtx = await weth.deposit({value: wethAmount})
-        await wethtx.wait()
-        const wethtx2 = await weth.deposit({value: wethAmount})
-        await wethtx2.wait()
-        const approvetx = await weth.approve(swapAddress, wethAmount)
-        await approvetx.wait()
-        console.log(await weth.balanceOf(accounts[0]))
+        const approvetx = await weth.approve(swapRouter, wethAmount)
 
         const swapForRsc = await swapRouter.exactInputSingle({
             tokenIn: wethAddress,
@@ -129,15 +124,86 @@ describe("Mimisbrunnr", async () => {
             amountOutMinimum: 0,
             sqrtPriceLimitX96: 0
         })
+        const rscAmount = await rsc.balanceOf(accounts[0].address)
+        console.log('rscamount', rscAmount)
+        const rscApprovetx = await rsc.approve(nfpmAddress, rscAmount)
 
+        const wethtx2 = await weth.deposit({value: wethAmount})
+        const approvetx2 = await weth.approve(nfpmAddress, wethAmount)
+        
         console.log('=======================')
-        console.log(await weth.balanceOf(accounts[0]))
-        console.log(await rsc.balanceOf(accounts[0]))
+        console.log('weth: ', await weth.balanceOf(accounts[0]))
+        console.log('rsc: ', await rsc.balanceOf(accounts[0]))
         console.log('=======================')
-        const approvetx3 = await rsc.approve(nfpmAddress, await rsc.balanceOf(accounts[0]))
+
+        const minttx = await nfpm.mint({
+            token0: wethAddress,
+            token1: rscAddress,
+            fee: 10000,
+            tickLower: Math.ceil(-887272 / 200) * 200,
+            tickUpper: Math.floor(887272 / 200) * 200,
+            amount0Desired: wethAmount,
+            amount1Desired: rscAmount,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: await mimisbrunnr.getAddress(),
+            deadline: Math.floor(new Date().getTime() / 1000) + 3600
+        })
+        console.log('=======================')
+        console.log('weth: ', await weth.balanceOf(accounts[0]))
+        console.log('rsc: ', await rsc.balanceOf(accounts[0]))
+        console.log('=======================')
+        const filter =  nfpm.filters.Transfer()
+        const events = await nfpm.queryFilter(
+            filter,
+            (await hre.ethers.provider.getBlockNumber()) - 1, 
+            (await hre.ethers.provider.getBlockNumber())
+        )
+        
+        await mimisbrunnr.setMimisPositionForToken(await rsc.getAddress(), events[0].args[2])
+    })
+
+    it("should accept a RSC WETH Liquidity position", async () => {
+        const wethAmount = hre.ethers.parseUnits('0.1', 'ether')
+        const wethtx = await weth.deposit({value: wethAmount})
+        await wethtx.wait()
+        const wethtx2 = await weth.deposit({value: wethAmount})
+        await wethtx2.wait()
+        const approvetx = await weth.approve(swapAddress, wethAmount)
+        await approvetx.wait()
+        console.log('=======================')
+        console.log('weth amount::::::::::::::', await weth.balanceOf(accounts[0]))
+        console.log('rsc: ', await rsc.balanceOf(accounts[0]))
+        console.log('weth:swapAddress:approved', await weth.allowance(accounts[0].address, swapRouter))
+        console.log('=======================')
+
+        const swapForRsc = await swapRouter.exactInputSingle({
+            tokenIn: wethAddress,
+            tokenOut: rscAddress,
+            fee: 10000,
+            recipient: accounts[0].address,
+            deadline: Math.floor(new Date().getTime() / 1000) + 3600,
+            amountIn: wethAmount,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0
+        })
+        console.log('hi')
+        await swapForRsc.wait()
+        console.log('hi2')
+        const rscBalance = await rsc.balanceOf(accounts[0].address)
+        console.log(rscBalance)
+        const rscallowance = await rsc.allowance(accounts[0].address, nfpmAddress)
+        console.log(rscallowance)
+        await rsc.approve(nfpmAddress, 0n)
+        const approvetx3 = await rsc.approve(nfpmAddress, rscBalance)
         await approvetx3.wait()
+        const wethtx3 = await weth.deposit({value: wethAmount})
         const approvetx4 = await weth.approve(nfpmAddress, wethAmount)
         await approvetx4.wait()
+        console.log('=======================')
+        console.log('weth: ', await weth.balanceOf(accounts[0]))
+        console.log('rsc: ', await rsc.balanceOf(accounts[0]))
+        console.log('=======================')
 
         const minttx = await nfpm.mint({
             token0: wethAddress,
@@ -155,21 +221,20 @@ describe("Mimisbrunnr", async () => {
         await minttx.wait()
 
 
-        const filter =  nfpm.filters.Transfer()
-        const events = await nfpm.queryFilter(
-            filter,
+        const filterTransfer =  nfpm.filters.Transfer()
+        const eventsTransfer = await nfpm.queryFilter(
+            filterTransfer,
             (await hre.ethers.provider.getBlockNumber()) - 1, 
             (await hre.ethers.provider.getBlockNumber())
         )
-        console.log('events', events)
         console.log('=======================')
         console.log('mims', await mimisbrunnr.balanceOf(accounts[0]))
         console.log('weth', await weth.balanceOf(accounts[0]))
         console.log('rsc', await rsc.balanceOf(accounts[0]))
         console.log('=======================')
-        const approvetx5 = await nfpm.approve(await mimisbrunnr.getAddress(), events[0].args[2])
+        const approvetx5 = await nfpm.approve(await mimisbrunnr.getAddress(), eventsTransfer[0].args[2])
         await approvetx5.wait()
-        const selltx = await mimisbrunnr.sellLP(events[0].args[2])
+        const selltx = await mimisbrunnr.sellLP(eventsTransfer[0].args[2])
         await selltx.wait()
         console.log('=======================')
         console.log('mims', await mimisbrunnr.balanceOf(accounts[0]))
