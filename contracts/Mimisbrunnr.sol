@@ -132,9 +132,18 @@ contract Mimisbrunnr is ERC20 {
         pools[address(this)] = MIMSWETH;
     }
 
+    function addPool(address token, PoolParams calldata poolParams) public {
+        require(msg.sender == operator, "only callable by owner");
+        pools[token] = poolParams;
+        setMimisPositionForToken(token, poolParams.mimisPosition);
+    }
+
     function setMimisPositionForToken(address token, uint256 tokenId) public {
         require(msg.sender == operator, "only callable by owner");
         pools[token].mimisPosition = tokenId;
+        (, , ,,,,, uint128 liquidity, , , , ) = infpm.positions(tokenId);
+        pools[token].protocolOwnedLiquidity = liquidity;
+        totalProtocolOwnedLiquidity += liquidity;
         IERC20(token).approve(address(infpm), type(uint256).max);
         IERC20(WETH).approve(address(infpm), type(uint256).max);
     }
@@ -237,7 +246,7 @@ contract Mimisbrunnr is ERC20 {
         console.log('sellLP:liquidityAdded', liquidityAdded);
         totalProtocolOwnedLiquidity += liquidityAdded;
         infpm.burn(erc721Id);
-        _mint(owner, liquidity);
+        _mint(msg.sender, liquidity);
     }
 
     function unwrapMims(
@@ -296,13 +305,10 @@ contract Mimisbrunnr is ERC20 {
                     if (colAmount1 > amount1) {
                         (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(operator, colAmount1 - amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, colAmount1 - amount1));
                     }
-
-
                 }
-                
             }
        }
-
+        _burn(msg.sender, amount);
     }
     /*
     function claimReward(

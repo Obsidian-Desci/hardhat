@@ -1,4 +1,6 @@
 import hre from 'hardhat'
+import * as fs from 'node:fs'
+import MimisBrunnr from '../artifacts/contracts/Mimisbrunnr.sol/Mimisbrunnr.json'
 export async function main() {
 
   const mimisbrunnr = await hre.ethers.deployContract(
@@ -7,6 +9,15 @@ export async function main() {
 
   await mimisbrunnr.waitForDeployment();
   console.log(await mimisbrunnr.getAddress())
+
+  fs.writeFile('./abi/Mimisbrunnr.json', JSON.stringify({
+    address: await mimisbrunnr.getAddress(),
+    abi:MimisBrunnr.abi
+  }), (err) => {
+    if (err) {
+      console.log(err)
+    }
+  });
   return await mimisbrunnr.getAddress()
  
 }

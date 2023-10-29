@@ -26,6 +26,13 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic: process.env.MNEMONIC || ''
       }
+    },
+    goerli: {
+      url: process.env.TENDERLY_GOERLI,
+      chainId: 5,
+      accounts: {
+        mnemonic: process.env.MNEMONIC || ''
+      }
     }
   },
 };
