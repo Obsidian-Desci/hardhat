@@ -10,7 +10,7 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import "./RewardMath.sol";
 import "hardhat/console.sol";
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
-
+import '@uniswap/v3-core/contracts/libraries/FullMath.sol';
 interface IERC20Decimals is IERC20 {
     function decimals() external view returns (uint8);
 }
@@ -133,7 +133,7 @@ contract Mimisbrunnr is ERC20 {
     }
 
     function setMimisPositionForToken(address token, uint256 tokenId) public {
-        require(msg.sender == operator);
+        require(msg.sender == operator, "only callable by owner");
         pools[token].mimisPosition = tokenId;
         IERC20(token).approve(address(infpm), type(uint256).max);
         IERC20(WETH).approve(address(infpm), type(uint256).max);
@@ -226,7 +226,6 @@ contract Mimisbrunnr is ERC20 {
         require(poolParams.pool != address(0), 'must be a valid pool');
         IUniswapV3Pool pool = IUniswapV3Pool(poolParams.pool);
         
-        totalProtocolOwnedLiquidity += liquidity;
         infpm.transferFrom(msg.sender, address(this), erc721Id);
         uint128 liquidityAdded = mergeLiquidity(
             erc721Id,
@@ -234,7 +233,9 @@ contract Mimisbrunnr is ERC20 {
             liquidity
         );
         deposits[msg.sender][address(pool)] += liquidityAdded;
-        pools[poolParams.pool].protocolOwnedLiquidity += liquidityAdded;
+        pools[(wethIsToken0 ? token1: token0)].protocolOwnedLiquidity += liquidityAdded;
+        console.log('sellLP:liquidityAdded', liquidityAdded);
+        totalProtocolOwnedLiquidity += liquidityAdded;
         infpm.burn(erc721Id);
         _mint(owner, liquidity);
     }
@@ -245,28 +246,52 @@ contract Mimisbrunnr is ERC20 {
        address[5] memory poolAddrs = [VITA, RSC, LAKE, GROW, HAIR];
        IUniswapV3Pool mimsPool = IUniswapV3Pool(MIMSWETH.pool);
        for (uint i =0; i< poolAddrs.length; i++) {
-           PoolParams memory poolParams = pools[poolAddrs[i]];
-           IUniswapV3Pool pool = IUniswapV3Pool(poolParams.pool);
-            INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseParams =
-            INonfungiblePositionManager.DecreaseLiquidityParams({
-                tokenId: poolParams.mimisPosition,
-                liquidity: (uint128(amount) * ((poolParams.protocolOwnedLiquidity * 1e27) / totalProtocolOwnedLiquidity)) / 1e27,
-                amount0Min: 0,
-                amount1Min: 0,
-                deadline: block.timestamp + 3600
-            });
-            (uint256 amount0, uint256 amount1) = infpm.decreaseLiquidity(decreaseParams);
-            (poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, amount0));
-            (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, amount1));
+            console.log('poolAddrs[i]', poolAddrs[i]);
+            PoolParams memory poolParams = pools[poolAddrs[i]];
+            IUniswapV3Pool pool = IUniswapV3Pool(poolParams.pool);
+            if (poolParams.protocolOwnedLiquidity == 0 || totalProtocolOwnedLiquidity == 0) {
+                
+            } else {
+                uint256 calcedLiquidity = FullMath.mulDiv(amount, uint256(poolParams.protocolOwnedLiquidity), uint256(totalProtocolOwnedLiquidity));
+                console.log('calcledliquidity', calcedLiquidity);
+                console.log('uint128(calcedliquidity)', uint128(calcedLiquidity));
+                if (calcedLiquidity == 0) {
+                    console.log('liquidity is zero for this pair, skipping');
+                } else {
+                    INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseParams =
+                    INonfungiblePositionManager.DecreaseLiquidityParams({
+                        tokenId: poolParams.mimisPosition,
+                        liquidity: uint128(calcedLiquidity),
+                        amount0Min: 0,
+                        amount1Min: 0,
+                        deadline: block.timestamp + 3600
+                    });
+                    infpm.decreaseLiquidity(decreaseParams);
+                    INonfungiblePositionManager.CollectParams memory collectParams =
+                    INonfungiblePositionManager.CollectParams({
+                        tokenId: poolParams.mimisPosition,
+                        recipient: address(this),
+                        amount0Max: type(uint128).max,
+                        amount1Max: type(uint128).max
+                    });
+                    (uint256 amount0, uint256 amount1) = infpm.collect(collectParams);
+                    if (uint128(calcedLiquidity) > totalProtocolOwnedLiquidity) {
+                        totalProtocolOwnedLiquidity = 0;
+                    } else {
+                        totalProtocolOwnedLiquidity -= uint128(calcedLiquidity);
+                    }
+                    if (pools[poolAddrs[i]].protocolOwnedLiquidity < uint128(calcedLiquidity)) {
+                        pools[poolAddrs[i]].protocolOwnedLiquidity = 0;
+                    } else {
+                        pools[poolAddrs[i]].protocolOwnedLiquidity -= uint128(calcedLiquidity);
+                    }
+                    console.log('liquidity decreased');
+                    (poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, amount0));
+                    (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, amount1));
 
-            INonfungiblePositionManager.CollectParams memory collectParams =
-            INonfungiblePositionManager.CollectParams({
-                tokenId: poolParams.mimisPosition,
-                recipient: address(this),
-                amount0Max: type(uint128).max,
-                amount1Max: type(uint128).max
-            });
-            infpm.collect(collectParams);
+                }
+                
+            }
        }
 
     }
