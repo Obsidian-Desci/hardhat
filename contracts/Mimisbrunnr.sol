@@ -248,9 +248,9 @@ contract Mimisbrunnr is ERC20 {
        for (uint i =0; i< poolAddrs.length; i++) {
             console.log('poolAddrs[i]', poolAddrs[i]);
             PoolParams memory poolParams = pools[poolAddrs[i]];
-            IUniswapV3Pool pool = IUniswapV3Pool(poolParams.pool);
+            //IUniswapV3Pool pool = IUniswapV3Pool(poolParams.pool);
             if (poolParams.protocolOwnedLiquidity == 0 || totalProtocolOwnedLiquidity == 0) {
-                
+               console.log('no liquidity for this pair or liquidity left in mimisbrunnr');
             } else {
                 uint256 calcedLiquidity = FullMath.mulDiv(amount, uint256(poolParams.protocolOwnedLiquidity), uint256(totalProtocolOwnedLiquidity));
                 console.log('calcledliquidity', calcedLiquidity);
@@ -266,7 +266,7 @@ contract Mimisbrunnr is ERC20 {
                         amount1Min: 0,
                         deadline: block.timestamp + 3600
                     });
-                    infpm.decreaseLiquidity(decreaseParams);
+                    (uint256 amount0, uint256 amount1) = infpm.decreaseLiquidity(decreaseParams);
                     INonfungiblePositionManager.CollectParams memory collectParams =
                     INonfungiblePositionManager.CollectParams({
                         tokenId: poolParams.mimisPosition,
@@ -274,7 +274,7 @@ contract Mimisbrunnr is ERC20 {
                         amount0Max: type(uint128).max,
                         amount1Max: type(uint128).max
                     });
-                    (uint256 amount0, uint256 amount1) = infpm.collect(collectParams);
+                    (uint256 colAmount0, uint256 colAmount1) = infpm.collect(collectParams);
                     if (uint128(calcedLiquidity) > totalProtocolOwnedLiquidity) {
                         totalProtocolOwnedLiquidity = 0;
                     } else {
@@ -286,8 +286,17 @@ contract Mimisbrunnr is ERC20 {
                         pools[poolAddrs[i]].protocolOwnedLiquidity -= uint128(calcedLiquidity);
                     }
                     console.log('liquidity decreased');
+                    // unwrappers earn the tokens staked as LP
                     (poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, amount0));
                     (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, amount1));
+                    // Mimsbrunnr earns the rewards earned on the LP 
+                    if (colAmount0 > amount0) {
+                        (poolParams.wethIsToken0 ? IERC20(WETH).transfer(operator, colAmount0 - amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, colAmount0 - amount0));
+                    }
+                    if (colAmount1 > amount1) {
+                        (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(operator, colAmount1 - amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, colAmount1 - amount1));
+                    }
+
 
                 }
                 
