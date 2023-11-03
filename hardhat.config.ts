@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
+//import "@nomiclabs/hardhat-etherscan"
 const config: HardhatUserConfig = {
   solidity: {
     version: "0.8.20",
@@ -13,7 +14,9 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
+      chainId: 1337,
       forking: {
+        blockNumber: 18458946,
         url: process.env.TENDERLY_FORK
       },
       accounts: {
@@ -33,8 +36,18 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic: process.env.MNEMONIC || ''
       }
+    },
+    mainnet: {
+      url: process.env.TENDERLY_MAINNET,
+      chainId: 1,
+      accounts: {
+        mnemonic: process.env.MNEMONIC || ''
+      }
     }
   },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN
+  }
 };
 
 export default config;

@@ -48,7 +48,7 @@ contract Mimisbrunnr is ERC20 {
     address RSC = 0xD101dCC414F310268c37eEb4cD376CcFA507F571;
     //address RSCWETH = 0xeC2061372a02D5e416F5D8905eea64Cab2c10970;
 
-    PoolParams MIMSWETH = PoolParams({
+    PoolParams MIMISWETH = PoolParams({
         pool: address(0),
         fee: 10000,
         wethIsToken0: false,
@@ -99,7 +99,7 @@ contract Mimisbrunnr is ERC20 {
     //address ATH = 0xa4ffdf3208f46898ce063e25c1c43056fa754739;
 
     mapping (address => PoolParams) public pools;
-    
+    address[] public poolAddrs;
 
     INonfungiblePositionManager public infpm = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
 
@@ -108,10 +108,10 @@ contract Mimisbrunnr is ERC20 {
     uint256 startTime;
     uint256 rewardMultiplier;
     address operator;
-    uint128 totalProtocolOwnedLiquidity;
+    uint128 public totalProtocolOwnedLiquidity;
 
-    constructor() ERC20("Mimisbrunnr", "MIMS") {
-        _mint(msg.sender, 10 * (10**18));
+    constructor() ERC20("Mimisbrunnr", "MIMIS") {
+        _mint(msg.sender, 0);
         startTime = block.timestamp;
         rewardMultiplier = 1;
         operator = msg.sender;
@@ -121,20 +121,23 @@ contract Mimisbrunnr is ERC20 {
         pools[LAKE] = LAKEWETH;
         pools[GROW] = GROWWETH;
         pools[HAIR] = HAIRWETH;
+
+        poolAddrs = [VITA, RSC, LAKE, GROW, HAIR];
     }
 
-    function setMimsPool(address mimisEthPool) public {
+    function setMimisPool(address mimisEthPool) public {
         require(msg.sender == operator);
         IUniswapV3Pool pool = IUniswapV3Pool(mimisEthPool);
-        MIMSWETH.fee = pool.fee();
-        MIMSWETH.wethIsToken0 = (pool.token0() == WETH);
-        MIMSWETH.protocolOwnedLiquidity = 0;
-        pools[address(this)] = MIMSWETH;
+        MIMISWETH.fee = pool.fee();
+        MIMISWETH.wethIsToken0 = (pool.token0() == WETH);
+        MIMISWETH.protocolOwnedLiquidity = 0;
+        pools[address(this)] = MIMISWETH;
     }
 
     function addPool(address token, PoolParams calldata poolParams) public {
         require(msg.sender == operator, "only callable by owner");
         pools[token] = poolParams;
+        poolAddrs.push(token);
         setMimisPositionForToken(token, poolParams.mimisPosition);
     }
 
@@ -144,6 +147,7 @@ contract Mimisbrunnr is ERC20 {
         (, , ,,,,, uint128 liquidity, , , , ) = infpm.positions(tokenId);
         pools[token].protocolOwnedLiquidity = liquidity;
         totalProtocolOwnedLiquidity += liquidity;
+        _mint(address(this), liquidity);
         IERC20(token).approve(address(infpm), type(uint256).max);
         IERC20(WETH).approve(address(infpm), type(uint256).max);
     }
@@ -158,25 +162,6 @@ contract Mimisbrunnr is ERC20 {
         return FullMath.mulDiv(numerator1, numerator2, 1 << 192);
     }
 
-    function onlyValidTokens(address token) internal view {
-        require((token == WETH || token == VITA || token == HAIR || token == GROW || token == LAKE || token == RSC), "invalid token");
-    }
-
-    /*
-    function stakes(uint256 erc721Id)
-        public
-        view
-        returns (uint160 secondsPerLiquidityInsideInitialX128, uint128 liquidity)
-    {
-        Stake storage stake = _stakes[erc721Id];
-        secondsPerLiquidityInsideInitialX128 = stake.secondsPerLiquidityInsideInitialX128;
-        liquidity = stake.liquidityNoOverflow;
-        if (liquidity == type(uint96).max) {
-            liquidity = stake.liquidityIfOverflow;
-        }
-    }
-    */
-
    function mergeLiquidity(
        uint256 erc721Id,
        uint256 mimisPosition,
@@ -190,10 +175,7 @@ contract Mimisbrunnr is ERC20 {
             amount1Min: 0,
             deadline: block.timestamp + 3600
         });
-        (uint256 returnedAmount0 , uint256 returnedAmount1 ) = infpm.decreaseLiquidity(decreaseParams);
-        console.log('decreased');
-        console.log('returnedAmount0', returnedAmount0);
-        console.log('returnedAmount1', returnedAmount1);
+        infpm.decreaseLiquidity(decreaseParams);
         INonfungiblePositionManager.CollectParams memory collectParams =
         INonfungiblePositionManager.CollectParams({
             tokenId: erc721Id,
@@ -202,9 +184,6 @@ contract Mimisbrunnr is ERC20 {
             amount1Max: type(uint128).max
         });
         (uint256 collected0, uint256 collected1 ) = infpm.collect(collectParams);
-        console.log('collected');
-        console.log('collected0', collected0);
-        console.log('collected1', collected1);
         INonfungiblePositionManager.IncreaseLiquidityParams memory increaseParams =
         INonfungiblePositionManager.IncreaseLiquidityParams({
                 tokenId: mimisPosition,
@@ -215,7 +194,6 @@ contract Mimisbrunnr is ERC20 {
                 deadline: block.timestamp + 3600
         });
         (liquidityAdded, ,) = infpm.increaseLiquidity(increaseParams);
-        console.log('increased');
    }
 
    //event Tick (int24 indexed tickLower, int24 tickUpper);
@@ -246,98 +224,61 @@ contract Mimisbrunnr is ERC20 {
         console.log('sellLP:liquidityAdded', liquidityAdded);
         totalProtocolOwnedLiquidity += liquidityAdded;
         infpm.burn(erc721Id);
-        _mint(msg.sender, liquidity);
+        _mint(msg.sender, liquidityAdded);
     }
 
-    function unwrapMims(
+    function unwrapMimis(
         uint256 amount
     ) public {
-       address[5] memory poolAddrs = [VITA, RSC, LAKE, GROW, HAIR];
-       IUniswapV3Pool mimsPool = IUniswapV3Pool(MIMSWETH.pool);
+       //IUniswapV3Pool mimsPool = IUniswapV3Pool(MIMSWETH.pool);
+       uint128 initialProtocolOwnedLiquidity = totalProtocolOwnedLiquidity;
        for (uint i =0; i< poolAddrs.length; i++) {
-            console.log('poolAddrs[i]', poolAddrs[i]);
             PoolParams memory poolParams = pools[poolAddrs[i]];
-            //IUniswapV3Pool pool = IUniswapV3Pool(poolParams.pool);
-            if (poolParams.protocolOwnedLiquidity == 0 || totalProtocolOwnedLiquidity == 0) {
-               console.log('no liquidity for this pair or liquidity left in mimisbrunnr');
+            
+            console.log('totol pool liquidity    :', poolParams.protocolOwnedLiquidity);
+            console.log('total Protocol Liquidity:', totalProtocolOwnedLiquidity);
+            uint256 calcedLiquidity = FullMath.mulDiv(amount, uint256(poolParams.protocolOwnedLiquidity), uint256(initialProtocolOwnedLiquidity));
+            console.log('calcledliquidity', calcedLiquidity);
+            console.log('uint128(calcedliquidity)', uint128(calcedLiquidity));
+            if (calcedLiquidity == 0) {
+                console.log('liquidity is zero for this pair, skipping');
             } else {
-                uint256 calcedLiquidity = FullMath.mulDiv(amount, uint256(poolParams.protocolOwnedLiquidity), uint256(totalProtocolOwnedLiquidity));
-                console.log('calcledliquidity', calcedLiquidity);
-                console.log('uint128(calcedliquidity)', uint128(calcedLiquidity));
-                if (calcedLiquidity == 0) {
-                    console.log('liquidity is zero for this pair, skipping');
-                } else {
-                    INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseParams =
-                    INonfungiblePositionManager.DecreaseLiquidityParams({
-                        tokenId: poolParams.mimisPosition,
-                        liquidity: uint128(calcedLiquidity),
-                        amount0Min: 0,
-                        amount1Min: 0,
-                        deadline: block.timestamp + 3600
-                    });
-                    (uint256 amount0, uint256 amount1) = infpm.decreaseLiquidity(decreaseParams);
-                    INonfungiblePositionManager.CollectParams memory collectParams =
-                    INonfungiblePositionManager.CollectParams({
-                        tokenId: poolParams.mimisPosition,
-                        recipient: address(this),
-                        amount0Max: type(uint128).max,
-                        amount1Max: type(uint128).max
-                    });
-                    (uint256 colAmount0, uint256 colAmount1) = infpm.collect(collectParams);
-                    if (uint128(calcedLiquidity) > totalProtocolOwnedLiquidity) {
-                        totalProtocolOwnedLiquidity = 0;
-                    } else {
-                        totalProtocolOwnedLiquidity -= uint128(calcedLiquidity);
-                    }
-                    if (pools[poolAddrs[i]].protocolOwnedLiquidity < uint128(calcedLiquidity)) {
-                        pools[poolAddrs[i]].protocolOwnedLiquidity = 0;
-                    } else {
-                        pools[poolAddrs[i]].protocolOwnedLiquidity -= uint128(calcedLiquidity);
-                    }
-                    console.log('liquidity decreased');
-                    // unwrappers earn the tokens staked as LP
-                    (poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, amount0));
-                    (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, amount1));
-                    // Mimsbrunnr earns the rewards earned on the LP 
-                    if (colAmount0 > amount0) {
-                        (poolParams.wethIsToken0 ? IERC20(WETH).transfer(operator, colAmount0 - amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, colAmount0 - amount0));
-                    }
-                    if (colAmount1 > amount1) {
-                        (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(operator, colAmount1 - amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, colAmount1 - amount1));
-                    }
+                console.log('1');
+                INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseParams =
+                INonfungiblePositionManager.DecreaseLiquidityParams({
+                    tokenId: poolParams.mimisPosition,
+                    liquidity: uint128(calcedLiquidity),
+                    amount0Min: 0,
+                    amount1Min: 0,
+                    deadline: block.timestamp + 3600
+                });
+                (uint256 amount0, uint256 amount1) = infpm.decreaseLiquidity(decreaseParams);
+
+                console.log('2');
+                INonfungiblePositionManager.CollectParams memory collectParams =
+                INonfungiblePositionManager.CollectParams({
+                    tokenId: poolParams.mimisPosition,
+                    recipient: address(this),
+                    amount0Max: type(uint128).max,
+                    amount1Max: type(uint128).max
+                });
+                (uint256 colAmount0, uint256 colAmount1) = infpm.collect(collectParams);
+                totalProtocolOwnedLiquidity -= uint128(calcedLiquidity);
+                pools[poolAddrs[i]].protocolOwnedLiquidity -= uint128(calcedLiquidity);
+                //console.log('liquidity decreased');
+                // unwrappers earn the tokens staked as LP
+                (poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, amount0));
+                (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, amount1));
+                // Mimsbrunnr earns the rewards earned on the LP
+                // In current versions it would likely make sense to automatically reinvest a portion of these rewards into the pools
+                if (colAmount0 > amount0) {
+                    (poolParams.wethIsToken0 ? IERC20(WETH).transfer(address(this), colAmount0 - amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, colAmount0 - amount0));
+                }
+                if (colAmount1 > amount1) {
+                    (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(address(this), colAmount1 - amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, colAmount1 - amount1));
                 }
             }
        }
         _burn(msg.sender, amount);
     }
-    /*
-    function claimReward(
-        uint256 erc721Id
-    ) external {
-        Deposit memory deposit = deposits[erc721Id];
-        require(deposit.owner == msg.sender, "sender must own deposit");
-        (, , address token0, address token1, uint24 fee, int24 tickLower, int24 tickUpper, uint128 liquidity, , , , ) = infpm.positions(erc721Id);
-        IUniswapV3Pool pool = IUniswapV3Pool(
-            (token0 == WETH ? poolAddresses[token1] : poolAddresses[token0])
-        );
-
-        (, uint160 secondsPerLiquidityInsideX128, ) =
-            pool.snapshotCumulativesInside(deposit.tickLower, deposit.tickUpper);
-        (uint160 secondsPerLiquidityInsideInitialX128,) = stakes(erc721Id);
-        (uint256 reward, uint160 secondsInsideX128) =
-            RewardMath.computeRewardAmount(
-                startTime,
-                liquidity,
-                secondsPerLiquidityInsideInitialX128,
-                secondsPerLiquidityInsideX128,
-                block.timestamp,
-                rewardMultiplier
-            );
-        totalSecondsClaimedX128 += secondsInsideX128;
-
-        rewards[msg.sender] -= reward;
-        _mint(msg.sender, reward);
-        //emit RewardClaimed(to, reward);
-    }
-    */
 }

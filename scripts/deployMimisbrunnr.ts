@@ -10,7 +10,7 @@ export async function main() {
   await mimisbrunnr.waitForDeployment();
   console.log(await mimisbrunnr.getAddress())
 
-  fs.writeFile('./abi/Mimisbrunnr.json', JSON.stringify({
+  fs.writeFile('./abi/MimisbrunnrV2.json', JSON.stringify({
     address: await mimisbrunnr.getAddress(),
     abi:MimisBrunnr.abi
   }), (err) => {

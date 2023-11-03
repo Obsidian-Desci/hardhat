@@ -41,11 +41,11 @@ export async function main() {
   const growWethPool = new hre.ethers.Contract(GROWWETH, poolAbi, signers[0])
   const vitaWethPool = new hre.ethers.Contract(VITAWETH, poolAbi, signers[0])
   const lakeWethPool = new hre.ethers.Contract(LAKEWETH, poolAbi, signers[0])
-  const wethAmount3 = hre.ethers.parseUnits('0.0001', 'ether')
-  const deposittx = await (weth.deposit({ value: wethAmount3 }))
-  await deposittx.wait()
-  const wethapprove1 = await weth.approve(swapRouter, wethAmount3)
-  await wethapprove1.wait()
+  //const wethAmount3 = hre.ethers.parseUnits('0.0001', 'ether')
+  //const deposittx = await (weth.deposit({ value: wethAmount3 }))
+  //await deposittx.wait()
+  //const wethapprove1 = await weth.approve(swapRouter, wethAmount3)
+  //await wethapprove1.wait()
 
 
   const createMimisPosition = async (
@@ -53,6 +53,7 @@ export async function main() {
     pool: hre.ethers.Contract
   ) => {
     const wethAmount = hre.ethers.parseUnits('0.00001', 'ether')
+    /*
     const swaptx = await swapRouter.exactInputSingle({
       tokenIn: wethAddress,
       tokenOut: await token.getAddress(),
@@ -64,54 +65,60 @@ export async function main() {
       sqrtPriceLimitX96: 0
     })
     await swaptx.wait()
-
     console.log('exact input single complete')
-    const tokenAmount = await token.balanceOf(signers[0].address)
-    const tokenapprovetx = await token.approve(nfpmAddress, tokenAmount)
-    await tokenapprovetx.wait()
+    console.log('tokenamount', tokenAmount)
+    //const tokenapprovetx1 = await token.approve(nfpmAddress, 0n)
+    //await tokenapprovetx1.wait()
+    const tokenapprovetx2 = await token.approve(nfpmAddress, tokenAmount)
+    await tokenapprovetx2.wait()
     //const deposit2tx = await weth.deposit({ value: wethAmount })
     //await deposit2tx.wait()
     const approvetx2 = await weth.approve(nfpmAddress, wethAmount)
     await approvetx2.wait()
+    */
+    const tokenAmount = await token.balanceOf(signers[0].address)
     console.log('=========================')
     console.log('tokenamount:', tokenAmount)
     console.log('wethamount', wethAmount)
+    console.log('tokenamount approved:', await token.allowance(signers[0].address, nfpmAddress))
+    console.log('wethamount', wethAmount)
+    console.log('tokenamount approved:', await weth.allowance(signers[0].address, nfpmAddress))
     console.log('=========================')
     console.log('attempting to mint position')
     const tickSpacing = Number(await pool.tickSpacing())
-    await nfpm.mint({
+    const nfpmtx = await nfpm.mint({
       token0: await pool.token0(),
       token1: await pool.token1(),
       fee: await pool.fee(),
       tickLower: Math.ceil(-887272 / tickSpacing) * tickSpacing,
       tickUpper: Math.floor(887272 / tickSpacing) * tickSpacing,
-      amount0Desired: wethAmount,
-      amount1Desired: tokenAmount,
+      amount0Desired: tokenAmount,
+      amount1Desired: wethAmount,
       amount0Min: 0,
       amount1Min: 0,
       recipient: await mimisbrunnr.getAddress(),
       deadline: Math.floor(new Date().getTime() / 1000) + 3600
     })
     console.log('mint complete')
+    await nfpmtx.wait()
     const filter = nfpm.filters.Transfer()
     const events = await nfpm.queryFilter(
       filter,
       (await hre.ethers.provider.getBlockNumber()) - 1,
       (await hre.ethers.provider.getBlockNumber())
     )
-
     await mimisbrunnr.setMimisPositionForToken(await token.getAddress(), events[0].args[2])
     console.log('position set')
 
   }
   console.log('1:grow')
-  await createMimisPosition(grow, growWethPool)
+  //await createMimisPosition(grow, growWethPool)
   console.log('2:hair')
-  await createMimisPosition(hair, hairWethPool)
-  console.log('3:vita')
-  await createMimisPosition(vita, vitaWethPool)
+  //await createMimisPosition(hair, hairWethPool)
+  //console.log('3:vita')
+  //await createMimisPosition(vita, vitaWethPool)
   console.log('4:rsc')
-  await createMimisPosition(rsc, rscWethPool)
+  //await createMimisPosition(rsc, rscWethPool)
   console.log('5:lake')
   await createMimisPosition(lake, lakeWethPool)
   console.log('6')
