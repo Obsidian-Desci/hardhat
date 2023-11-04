@@ -10,15 +10,14 @@ import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import "hardhat/console.sol";
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import '@uniswap/v3-core/contracts/libraries/FullMath.sol';
+import "./Staker/interfaces/IStaker.sol";
 interface IERC20Decimals is IERC20 {
     function decimals() external view returns (uint8);
 }
 
 
 contract Mimisbrunnr is ERC20 {
-    //  deposits[owner][Pool] = liquidity;
-    mapping (address => mapping (address => uint128)) public deposits;
-    mapping(address => uint256) public rewards;
+    address Staker;
 
     struct PoolParams  {
         address pool;
@@ -219,7 +218,7 @@ contract Mimisbrunnr is ERC20 {
             poolParams.mimisPosition,
             liquidity
         );
-        deposits[msg.sender][address(pool)] += liquidityAdded;
+        //deposits[msg.sender][address(pool)] += liquidityAdded;
         pools[(wethIsToken0 ? token1: token0)].protocolOwnedLiquidity += liquidityAdded;
         console.log('sellLP:liquidityAdded', liquidityAdded);
         totalProtocolOwnedLiquidity += liquidityAdded;

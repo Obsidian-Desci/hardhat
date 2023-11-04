@@ -36,6 +36,27 @@ contract Staker is IStaker {
         uint128 liquidityIfOverflow;
     }
 
+    address WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; 
+
+    address MIMIS;
+    address MIMISWETH;
+
+    address VITA = 0x81f8f0bb1cB2A06649E51913A151F0E7Ef6FA321;
+    address VITAWETH = 0xcBcC3cBaD991eC59204be2963b4a87951E4d292B;
+
+    //address ATH = 0xa4ffdf3208f46898ce063e25c1c43056fa754739;
+
+    address HAIR = 0x9Ce115f0341ae5daBC8B477b74E83db2018A6f42;
+    address HAIRWETH = 0x94DD312F6Cb52C870aACfEEb8bf5E4e28F6952ff;
+
+    address GROW = 0x761A3557184cbC07b7493da0661c41177b2f97fA;
+    address GROWWETH = 0x61847189477150832D658D8f34f84c603Ac269af;
+
+    address LAKE =  0xF9Ca9523E5b5A42C3018C62B084Db8543478C400;
+    address LAKEWETH = 0xeFd69F1FF464Ed673dab856c5b9bCA4D2847a74f;
+
+    address RSC = 0xD101dCC414F310268c37eEb4cD376CcFA507F571;
+    address RSCWETH = 0xeC2061372a02D5e416F5D8905eea64Cab2c10970;
 
     IUniswapV3Factory public factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
@@ -61,14 +82,55 @@ contract Staker is IStaker {
     }
     
     mapping(IERC20Minimal => mapping(address => uint256)) public  rewards;
+    address operator;
 
+    constructor (
+        address mimisWeth,
+        address mimis
+    ) {
+        MIMIS = mimis;
+        MIMISWETH = mimisWeth; 
+        operator = msg.sender;
+        uint256 fiveYears = 5 * 365 * 24 * 3600;
+        IncentiveKey memory rscKey = IncentiveKey(
+            IERC20Minimal(RSC), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
+        );
+        Incentive memory rscIncentive = Incentive(0,0,0);
+        bytes32 rscIncentiveId = IncentiveId.compute(rscKey);
+        incentives[rscIncentiveId]  = rscIncentive;
 
-    constructor () {
+        IncentiveKey memory growKey = IncentiveKey(
+            IERC20Minimal(GROW), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
+        );
+        Incentive memory growIncentive = Incentive(0,0,0);
+        bytes32 growIncentiveId = IncentiveId.compute(growKey);
+        incentives[growIncentiveId]  = growIncentive;
         
+        IncentiveKey memory hairKey = IncentiveKey(
+            IERC20Minimal(HAIR), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
+        );
+        Incentive memory hairIncentive = Incentive(0,0,0);
+        bytes32 hairIncentiveId = IncentiveId.compute(hairKey);
+        incentives[hairIncentiveId]  = hairIncentive;
+
+        IncentiveKey memory vitaKey = IncentiveKey(
+            IERC20Minimal(VITA), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
+        );
+        Incentive memory vitaIncentive = Incentive(0,0,0);
+        bytes32 vitaIncentiveId = IncentiveId.compute(vitaKey);
+        incentives[vitaIncentiveId]  = vitaIncentive;
+
+        IncentiveKey memory lakeKey = IncentiveKey(
+            IERC20Minimal(LAKE), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
+        );
+        Incentive memory lakeIncentive = Incentive(0,0,0);
+        bytes32 lakeIncentiveId = IncentiveId.compute(lakeKey);
+        incentives[lakeIncentiveId]  = lakeIncentive;
     }
 
-    function createIncentive(IncentiveKey memory key, uint256 reward) external override {
-        require(reward > 0, 'UniswapV3Staker::createIncentive: reward must be positive');
+    function createIncentive(IncentiveKey memory key, uint256 initialReward) external override {
+        require(msg.sender == operator, 'UniswapV3Staker::createIncentive: not operator');
+        //require(reward > 0, 'UniswapV3Staker::createIncentive: reward must be positive');
         require(
             block.timestamp <= key.startTime,
             'UniswapV3Staker::createIncentive: start time must be now or in the future'
@@ -89,11 +151,19 @@ contract Staker is IStaker {
         */
         bytes32 incentiveId = IncentiveId.compute(key);
 
-        incentives[incentiveId].totalRewardUnclaimed += reward;
+        incentives[incentiveId].totalRewardUnclaimed += initialReward;
 
-        TransferHelperExtended.safeTransferFrom(address(key.rewardToken), msg.sender, address(this), reward);
+        //TransferHelperExtended.safeTransferFrom(address(key.rewardToken), msg.sender, address(this), reward);
 
-        emit IncentiveCreated(key.rewardToken, key.pool, key.startTime, key.endTime, key.refundee, reward);
+        emit IncentiveCreated(key.rewardToken, key.pool, key.startTime, key.endTime, key.refundee, initialReward);
+    }
+
+    function fundIncentive(IncentiveKey memory key, uint256 amount) external {
+        require(msg.sender == operator || msg.sender == MIMIS, 'UniswapV3Staker::fundIncentive: not operator or mimis');
+
+        bytes32 incentiveId = IncentiveId.compute(key);
+        incentives[incentiveId].totalRewardUnclaimed += amount;
+        
     }
 
     function endIncentive(IncentiveKey memory key) external override returns (uint256 refund) {

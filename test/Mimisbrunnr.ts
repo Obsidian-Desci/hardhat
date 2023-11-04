@@ -409,7 +409,7 @@ describe("Mimisbrunnr", async () => {
             poolAddress:  RSCWETH,
             startTime: Math.floor(new Date().getTime() / 1000),
             endTime: Math.floor(new Date().getTime() / 1000) + (365 * 24 * 60 * 60),
-            refundee: await mimisbrunnr.getAddress()
+            totalReward: await mimisbrunnr.getAddress()
         })
     })
 

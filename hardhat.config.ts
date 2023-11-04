@@ -56,6 +56,13 @@ const config: HardhatUserConfig = {
       accounts: {
         mnemonic: process.env.MNEMONIC || ''
       }
+    },
+    filecoin: {
+      url: 'https://api.node.glif.io',
+      chainId: 314,
+      accounts: {
+        mnemonic: process.env.MNEMONIC || ''
+      }
     }
   },
   etherscan: {

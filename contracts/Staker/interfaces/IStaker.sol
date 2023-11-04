@@ -87,8 +87,8 @@ interface IStaker is IERC721Receiver {
 
     /// @notice Creates a new liquidity mining incentive program
     /// @param key Details of the incentive to create
-    /// @param reward The amount of reward tokens to be distributed
-    function createIncentive(IncentiveKey memory key, uint256 reward) external;
+    /// @param initialReward The amount of reward tokens to be distributed
+    function createIncentive(IncentiveKey memory key, uint256 initialReward) external;
 
     /// @notice Ends an incentive after the incentive end time has passed and all stakes have been withdrawn
     /// @param key Details of the incentive to end
