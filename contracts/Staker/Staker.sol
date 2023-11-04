@@ -63,6 +63,7 @@ contract Staker is IStaker {
     INonfungiblePositionManager public nfpm = INonfungiblePositionManager(0xC36442b4a4522E871399CD717aBDD847Ab11FE88);
 
     mapping(bytes32 => Incentive) public  incentives;
+    mapping(address => bytes32) public incentiveKeys;
 
     mapping(uint256 => Deposit) public  deposits;
 
@@ -91,13 +92,16 @@ contract Staker is IStaker {
         MIMIS = mimis;
         MIMISWETH = mimisWeth; 
         operator = msg.sender;
+        {
         uint256 fiveYears = 5 * 365 * 24 * 3600;
+
         IncentiveKey memory rscKey = IncentiveKey(
             IERC20Minimal(RSC), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
         );
         Incentive memory rscIncentive = Incentive(0,0,0);
         bytes32 rscIncentiveId = IncentiveId.compute(rscKey);
         incentives[rscIncentiveId]  = rscIncentive;
+        incentiveKeys[RSC] = rscIncentiveId;
 
         IncentiveKey memory growKey = IncentiveKey(
             IERC20Minimal(GROW), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
@@ -105,13 +109,17 @@ contract Staker is IStaker {
         Incentive memory growIncentive = Incentive(0,0,0);
         bytes32 growIncentiveId = IncentiveId.compute(growKey);
         incentives[growIncentiveId]  = growIncentive;
-        
+        incentiveKeys[GROW] = growIncentiveId;
+        }
+       { 
+        uint256 fiveYears = 5 * 365 * 24 * 3600;
         IncentiveKey memory hairKey = IncentiveKey(
             IERC20Minimal(HAIR), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
         );
         Incentive memory hairIncentive = Incentive(0,0,0);
         bytes32 hairIncentiveId = IncentiveId.compute(hairKey);
         incentives[hairIncentiveId]  = hairIncentive;
+        incentiveKeys[HAIR] = hairIncentiveId;
 
         IncentiveKey memory vitaKey = IncentiveKey(
             IERC20Minimal(VITA), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
@@ -119,6 +127,7 @@ contract Staker is IStaker {
         Incentive memory vitaIncentive = Incentive(0,0,0);
         bytes32 vitaIncentiveId = IncentiveId.compute(vitaKey);
         incentives[vitaIncentiveId]  = vitaIncentive;
+        incentiveKeys[VITA] = vitaIncentiveId;
 
         IncentiveKey memory lakeKey = IncentiveKey(
             IERC20Minimal(LAKE), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
@@ -126,6 +135,17 @@ contract Staker is IStaker {
         Incentive memory lakeIncentive = Incentive(0,0,0);
         bytes32 lakeIncentiveId = IncentiveId.compute(lakeKey);
         incentives[lakeIncentiveId]  = lakeIncentive;
+        incentiveKeys[LAKE] = lakeIncentiveId;
+        
+        IncentiveKey memory wethKey = IncentiveKey(
+            IERC20Minimal(WETH), IUniswapV3Pool(MIMISWETH), block.timestamp, block.timestamp + fiveYears, operator
+        );
+
+        Incentive memory wethIncentive = Incentive(0,0,0);
+        bytes32 wethIncentiveId = IncentiveId.compute(wethKey);
+        incentives[wethIncentiveId]  = wethIncentive;
+        incentiveKeys[WETH] = wethIncentiveId;
+       }
     }
 
     function createIncentive(IncentiveKey memory key, uint256 initialReward) external override {
@@ -158,10 +178,11 @@ contract Staker is IStaker {
         emit IncentiveCreated(key.rewardToken, key.pool, key.startTime, key.endTime, key.refundee, initialReward);
     }
 
-    function fundIncentive(IncentiveKey memory key, uint256 amount) external {
+    function fundIncentive(address token, uint256 amount) external {
         require(msg.sender == operator || msg.sender == MIMIS, 'UniswapV3Staker::fundIncentive: not operator or mimis');
 
-        bytes32 incentiveId = IncentiveId.compute(key);
+        bytes32 incentiveId = incentiveKeys[token];
+        TransferHelperExtended.safeTransferFrom(token, MIMIS, address(this), amount);
         incentives[incentiveId].totalRewardUnclaimed += amount;
         
     }
@@ -374,6 +395,7 @@ contract Staker is IStaker {
                 secondsPerLiquidityInsideInitialX128: secondsPerLiquidityInsideX128,
                 liquidityNoOverflow: type(uint96).max,
                 liquidityIfOverflow: liquidity
+
             });
         } else {
             Stake storage stake = _stakes[tokenId][incentiveId];

@@ -90,6 +90,7 @@ interface IStaker is IERC721Receiver {
     /// @param initialReward The amount of reward tokens to be distributed
     function createIncentive(IncentiveKey memory key, uint256 initialReward) external;
 
+    function fundIncentive(address token, uint256 amount) external;
     /// @notice Ends an incentive after the incentive end time has passed and all stakes have been withdrawn
     /// @param key Details of the incentive to end
     /// @return refund The remaining reward tokens when the incentive is ended

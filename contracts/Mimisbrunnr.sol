@@ -17,7 +17,7 @@ interface IERC20Decimals is IERC20 {
 
 
 contract Mimisbrunnr is ERC20 {
-    address Staker;
+    address STAKER;
 
     struct PoolParams  {
         address pool;
@@ -104,14 +104,14 @@ contract Mimisbrunnr is ERC20 {
     IUniswapV3Factory public factory = IUniswapV3Factory(0x1F98431c8aD98523631AE4a59f267346ea31F984);
 
     uint256 startTime;
-    uint256 rewardMultiplier;
     address operator;
     uint128 public totalProtocolOwnedLiquidity;
+    uint256 protocolFee;
 
     constructor() ERC20("Mimisbrunnr", "MIMIS") {
         _mint(msg.sender, 0);
         startTime = block.timestamp;
-        rewardMultiplier = 1;
+        protocolFee = 50000; //5%
         operator = msg.sender;
 
         pools[VITA] = VITAWETH;
@@ -121,6 +121,17 @@ contract Mimisbrunnr is ERC20 {
         pools[HAIR] = HAIRWETH;
 
         poolAddrs = [VITA, RSC, LAKE, GROW, HAIR];
+    }
+
+    function setProtocolFee(uint256 fee) public {
+        require(msg.sender == operator, "only callable by owner");
+        require (fee <= 50000, "fee must be less than 5%");
+        protocolFee = fee;
+    }
+
+    function setStakingContract(address staker) public {
+        require(msg.sender == operator, "only callable by owner");
+        STAKER = staker;
     }
 
     function setMimisPool(address mimisEthPool) public {
@@ -271,13 +282,26 @@ contract Mimisbrunnr is ERC20 {
                 // Mimsbrunnr earns the rewards earned on the LP
                 // In current versions it would likely make sense to automatically reinvest a portion of these rewards into the pools
                 if (colAmount0 > amount0) {
-                    (poolParams.wethIsToken0 ? IERC20(WETH).transfer(address(this), colAmount0 - amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, colAmount0 - amount0));
+                    uint256 fee = FullMath.mulDiv(colAmount0 - amount0, protocolFee, 1000000);
+                    uint256 amountToReward = colAmount0 - amount0 - fee;
+                    (poolParams.wethIsToken0 ? IERC20(WETH).transfer(STAKER, amountToReward) : IERC20(poolAddrs[i]).transfer(STAKER, amountToReward));
                 }
                 if (colAmount1 > amount1) {
-                    (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(address(this), colAmount1 - amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, colAmount1 - amount1));
+                    uint256 fee = FullMath.mulDiv(colAmount0 - amount0, protocolFee, 1000000);
+                    uint256 amountToReward = colAmount0 - amount0 - fee;
+                    (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(STAKER, amountToReward) : IERC20(poolAddrs[i]).transfer(STAKER, amountToReward));
                 }
             }
        }
         _burn(msg.sender, amount);
+    }
+
+    function sweepFees() public { 
+        require(msg.sender == operator, 'only operator can call this function'); 
+        for (uint i =0; i< poolAddrs.length; i++) {
+            IERC20(poolAddrs[i]).transfer(operator, IERC20(poolAddrs[i]).balanceOf(address(this)));
+        }
+
+        IERC20(WETH).transfer(operator, IERC20(WETH).balanceOf(address(this)));
     }
 }
