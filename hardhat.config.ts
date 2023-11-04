@@ -4,13 +4,26 @@ import "@nomicfoundation/hardhat-toolbox";
 //import "@nomiclabs/hardhat-etherscan"
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.20",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 1000,
-      }
-    }
+    compilers: [
+      {
+        version: "0.8.15",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1000,
+          }
+        }
+      },
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1000,
+          }
+        }
+      },
+    ]
   },
   networks: {
     hardhat: {

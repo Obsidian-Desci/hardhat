@@ -5,6 +5,8 @@ import { address as factoryAddress, abi as factoryAbi } from "../abi/UniswapV3Fa
 import { address as nfpmAddress, abi as nfpmAbi } from "../abi/NonFungiblePositionManager.json"
 import { address as swapAddress, abi as swapAbi } from '../abi/SwapRouter.json'
 import {abi as poolAbi} from "../abi/UniswapV3Pool.json"
+import { address as stakerAddress, abi as stakerAbi} from '../abi/V3Staker.json'
+
 
 import { address as wethAddress, abi as wethAbi } from "../abi/WETH.json"
 import { address as rscAddress, abi as rscAbi } from "../abi/RSC.json"
@@ -28,7 +30,7 @@ describe("Mimisbrunnr", async () => {
     let uniswapFactory: hre.ethers.Contract;
     let swapRouter: hre.ethers.Contract;
     let nfpm: hre.ethers.Contract;
-    
+    let v3Staker: hre.ethers.Contract; 
     let weth: hre.ethers.Contract;
     let rsc: hre.ethers.Contract;
     let grow: hre.ethers.Contract;
@@ -49,9 +51,10 @@ describe("Mimisbrunnr", async () => {
         mimisbrunnr  = await hre.ethers.getContractAt("Mimisbrunnr", mimisbrunnrAddr)
         uniswapFactory = new hre.ethers.Contract(factoryAddress, factoryAbi, accounts[0]) 
         nfpm = new hre.ethers.Contract(nfpmAddress, nfpmAbi, accounts[0])
-        weth = new hre.ethers.Contract(wethAddress, wethAbi, accounts[0])
         swapRouter = new hre.ethers.Contract(swapAddress, swapAbi, accounts[0])
+        v3Staker = new hre.ethers.Contract(stakerAddress, stakerAbi, accounts[0])
 
+        weth = new hre.ethers.Contract(wethAddress, wethAbi, accounts[0])
         rsc = new hre.ethers.Contract(rscAddress, rscAbi, accounts[0])
         hair = new hre.ethers.Contract(hairAddress, hairAbi, accounts[0])
         grow = new hre.ethers.Contract(growAddress, growAbi, accounts[0])
@@ -396,6 +399,17 @@ describe("Mimisbrunnr", async () => {
             amount1Min: 0,
             recipient: accounts[0].address,
             deadline: Math.floor(new Date().getTime() / 1000) + 3600
+        })
+
+    })
+
+    it("should create incentive in uniswap v3 staker", async () => {
+        const rscIncentive = await v3Staker.createIncentive({
+            rewardToken: rscAddress,
+            poolAddress:  RSCWETH,
+            startTime: Math.floor(new Date().getTime() / 1000),
+            endTime: Math.floor(new Date().getTime() / 1000) + (365 * 24 * 60 * 60),
+            refundee: await mimisbrunnr.getAddress()
         })
     })
 
