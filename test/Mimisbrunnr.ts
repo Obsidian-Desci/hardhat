@@ -68,69 +68,6 @@ describe("Mimisbrunnr", async () => {
         
     })
 
-    it("initializes the MIMISWETH pool", async () => {
-        /*
-        console.log(await mimisbrunnr.getAddress())
-        const pooltx = await uniswapFactory.createPool(
-            await mimisbrunnr.getAddress(),
-            wethAddress,
-            10000
-        )
-        await pooltx.wait()
-
-        const poolAddr = await uniswapFactory.getPool(
-            await mimisbrunnr.getAddress(),
-            wethAddress,
-            10000
-        )
-        const setPooltx = await mimisbrunnr.setMimsPool(
-            poolAddr
-        )
-        await setPooltx.wait()
-        mimisWethPool = new hre.ethers.Contract(poolAddr, poolAbi, accounts[0])
-
-        const sqrtPriceX96 = 1n * 2n ** 96n
-        console.log(sqrtPriceX96)
-        const initTx = await mimisWethPool.initialize(
-           sqrtPriceX96 
-        )
-        await initTx.wait()
-        */
-    })
-
-    it("should provide initial liquidity", async () => {
-        /*
-        const initialTokenAmount = await hre.ethers.parseUnits('10', 'ether')
-        console.log('weth', await weth.balanceOf(accounts[0]))
-        const depositWethtx = await weth.deposit({ value: initialTokenAmount})
-        await depositWethtx.wait()
-
-        const wethApprovetx = await weth.approve(
-            await nfpm.getAddress(),
-            initialTokenAmount
-        )
-        await wethApprovetx.wait()
-        const mimisbrunnrApproveTx = await mimisbrunnr.approve(
-            await nfpm.getAddress(),
-            initialTokenAmount
-        )
-        await mimisbrunnrApproveTx.wait() 
-
-        const minttx = await nfpm.mint({
-            token0: await mimisbrunnr.getAddress(),
-            token1: wethAddress,
-            fee: 10000,
-            tickLower: Math.ceil(-887272 / 200) * 200,
-            tickUpper: Math.floor(887272 / 200) * 200,
-            amount0Desired: initialTokenAmount,
-            amount1Desired: initialTokenAmount,
-            amount0Min: 0,
-            amount1Min: 0,
-            recipient: await mimisbrunnr.getAddress(),
-            deadline: Math.floor(new Date().getTime() / 1000) + 3600
-        })
-        */
-    })
 
     it("should create the initial mimis positions", async () => {
         const createMimisPosition  = async (
@@ -321,7 +258,146 @@ describe("Mimisbrunnr", async () => {
         const lakeLiquidity = (await mimisbrunnr.pools(await lake.getAddress())).protocolOwnedLiquidity
         expect(rscLiquidity+growLiquidity+hairLiquidity+vitaLiquidity+lakeLiquidity).to.equal(totalProtocolLiquidity)
         expect(totalProtocolLiquidity).to.be.equal(totalSupply+4n)
-
     })
+
+    it("mint some mimis for initial liquidity", async () => {
+        
+        const zapMimis = async (
+            token:hre.ethers.Contract,
+            pool: hre.ethers.Contract,
+            wethAmount:number
+        ) => {
+            const depositAmount = hre.ethers.parseUnits(String(2*wethAmount), 'ether')
+            wethAmount = hre.ethers.parseUnits(String(wethAmount), 'ether')
+         
+            const wethtx = await weth.deposit({value: depositAmount})
+            await wethtx.wait()
+            const approvetx = await weth.approve(swapAddress, wethAmount)
+            await approvetx.wait()
+
+            const swap = await swapRouter.exactInputSingle({
+                tokenIn: wethAddress,
+                tokenOut: await token.getAddress(),
+                fee: await pool.fee(),
+                recipient: accounts[0].address,
+                deadline: Math.floor(new Date().getTime() / 1000) + 3600,
+                amountIn: wethAmount,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            })
+            await swap.wait()
+            const tokenBalance = await token.balanceOf(accounts[0].address)
+            await token.approve(nfpmAddress, 0n)
+            await token.approve(nfpmAddress, tokenBalance)
+            //const wethtx3 = await weth.deposit({value: wethAmount})
+            await weth.approve(nfpmAddress, wethAmount)
+            
+            const tickSpacing = Number(await pool.tickSpacing())
+            const minttx = await nfpm.mint({
+                token0: await pool.token0(),
+                token1: await pool.token1(),
+                fee: await pool.fee(),
+                tickLower: Math.ceil(-887272 / tickSpacing) * tickSpacing,
+                tickUpper: Math.floor(887272 / tickSpacing) * tickSpacing,
+                amount0Desired: wethAmount,
+                amount1Desired: tokenBalance,
+                amount0Min: 0,
+                amount1Min: 0,
+                recipient: accounts[0].address,
+                deadline: Math.floor(new Date().getTime() / 1000) + 3600
+            })
+            await minttx.wait()
+
+            const filterTransfer =  nfpm.filters.Transfer()
+            const eventsTransfer = await nfpm.queryFilter(
+                filterTransfer,
+                (await hre.ethers.provider.getBlockNumber()) - 1, 
+                (await hre.ethers.provider.getBlockNumber())
+            )
+
+            const approvetx5 = await nfpm.approve(await mimisbrunnr.getAddress(), eventsTransfer[0].args[2])
+            await approvetx5.wait()
+            const selltx = await mimisbrunnr.sellLP(eventsTransfer[0].args[2])
+            await selltx.wait()
+
+        }
+
+            await zapMimis(rsc, rscWethPool, 0.1)
+            await zapMimis(grow, growWethPool, 0.1)
+            await zapMimis(hair, hairWethPool, 0.1)
+            await zapMimis(vita, vitaWethPool, 0.1)
+            await zapMimis(lake, lakeWethPool, 0.1)
+
+            const totalSupply = await mimisbrunnr.totalSupply()
+            const totalProtocolLiquidity = await mimisbrunnr.totalProtocolOwnedLiquidity()
+            const rscLiquidity = (await mimisbrunnr.pools(await rsc.getAddress())).protocolOwnedLiquidity
+            const growLiquidity = (await mimisbrunnr.pools(await grow.getAddress())).protocolOwnedLiquidity
+            const hairLiquidity = (await mimisbrunnr.pools(await hair.getAddress())).protocolOwnedLiquidity
+            const vitaLiquidity = (await mimisbrunnr.pools(await vita.getAddress())).protocolOwnedLiquidity
+            const lakeLiquidity = (await mimisbrunnr.pools(await lake.getAddress())).protocolOwnedLiquidity
+            expect(rscLiquidity+growLiquidity+hairLiquidity+vitaLiquidity+lakeLiquidity).to.equal(totalProtocolLiquidity)
+            expect(totalProtocolLiquidity).to.be.equal(totalSupply+4n)
+    })
+
+    it("initializes the MIMISWETH pool", async () => {
+        console.log(await mimisbrunnr.getAddress())
+        const pooltx = await uniswapFactory.createPool(
+            await mimisbrunnr.getAddress(),
+            wethAddress,
+            10000
+        )
+        await pooltx.wait()
+
+        const poolAddr = await uniswapFactory.getPool(
+            await mimisbrunnr.getAddress(),
+            wethAddress,
+            10000
+        )
+        const setPooltx = await mimisbrunnr.setMimisPool(
+            poolAddr
+        )
+        await setPooltx.wait()
+        mimisWethPool = new hre.ethers.Contract(poolAddr, poolAbi, accounts[0])
+
+        const sqrtPriceX96 = 1n * 2n ** 96n
+        console.log(sqrtPriceX96)
+        const initTx = await mimisWethPool.initialize(
+           sqrtPriceX96 
+        )
+        await initTx.wait()
+    })
+    
+    it("should provide initial liquidity", async () => {
+        const initialTokenAmount = await hre.ethers.parseUnits('10', 'ether')
+        console.log('weth', await weth.balanceOf(accounts[0]))
+        const depositWethtx = await weth.deposit({ value: initialTokenAmount})
+        await depositWethtx.wait()
+
+        const wethApprovetx = await weth.approve(
+            await nfpm.getAddress(),
+            initialTokenAmount
+        )
+        await wethApprovetx.wait()
+        const mimisbrunnrApproveTx = await mimisbrunnr.approve(
+            await nfpm.getAddress(),
+            initialTokenAmount
+        )
+        await mimisbrunnrApproveTx.wait() 
+
+        const minttx = await nfpm.mint({
+            token0: await mimisbrunnr.getAddress(),
+            token1: wethAddress,
+            fee: 10000,
+            tickLower: Math.ceil(-887272 / 200) * 200,
+            tickUpper: Math.floor(887272 / 200) * 200,
+            amount0Desired: await mimisbrunnr.balanceOf(accounts[0].address),
+            amount1Desired: initialTokenAmount,
+            amount0Min: 0,
+            amount1Min: 0,
+            recipient: accounts[0].address,
+            deadline: Math.floor(new Date().getTime() / 1000) + 3600
+        })
+    })
+
 })
 

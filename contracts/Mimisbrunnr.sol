@@ -47,7 +47,7 @@ contract Mimisbrunnr is ERC20 {
 
     address RSC = 0xD101dCC414F310268c37eEb4cD376CcFA507F571;
     //address RSCWETH = 0xeC2061372a02D5e416F5D8905eea64Cab2c10970;
-
+    
     PoolParams MIMISWETH = PoolParams({
         pool: address(0),
         fee: 10000,
@@ -131,7 +131,8 @@ contract Mimisbrunnr is ERC20 {
         MIMISWETH.fee = pool.fee();
         MIMISWETH.wethIsToken0 = (pool.token0() == WETH);
         MIMISWETH.protocolOwnedLiquidity = 0;
-        pools[address(this)] = MIMISWETH;
+        // it'd be hilarious to make this recursive but no
+        //pools[address(this)] = MIMISWETH;
     }
 
     function addPool(address token, PoolParams calldata poolParams) public {
