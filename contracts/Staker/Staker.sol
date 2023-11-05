@@ -6,7 +6,7 @@ import '@uniswap/v3-core/contracts/interfaces/IERC20Minimal.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 ///import '@uniswap/v3-periphery/contracts/base/Multicall.sol';
 
-
+import "hardhat/console.sol";
 import "./interfaces/IStaker.sol";
 
 import "./libraries/IncentiveId.sol";
@@ -86,8 +86,8 @@ contract Staker is IStaker {
     address operator;
 
     constructor (
-        address mimisWeth,
-        address mimis
+        address mimis,
+        address mimisWeth
     ) {
         MIMIS = mimis;
         MIMISWETH = mimisWeth; 
@@ -179,10 +179,10 @@ contract Staker is IStaker {
     }
 
     function fundIncentive(address token, uint256 amount) external {
+        console.log('msg.sender', msg.sender);
         require(msg.sender == operator || msg.sender == MIMIS, 'UniswapV3Staker::fundIncentive: not operator or mimis');
 
         bytes32 incentiveId = incentiveKeys[token];
-        TransferHelperExtended.safeTransferFrom(token, MIMIS, address(this), amount);
         incentives[incentiveId].totalRewardUnclaimed += amount;
         
     }

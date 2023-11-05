@@ -5,7 +5,7 @@ import { address as factoryAddress, abi as factoryAbi } from "../abi/UniswapV3Fa
 import { address as nfpmAddress, abi as nfpmAbi } from "../abi/NonFungiblePositionManager.json"
 import { address as swapAddress, abi as swapAbi } from '../abi/SwapRouter.json'
 import {abi as poolAbi} from "../abi/UniswapV3Pool.json"
-import { address as stakerAddress, abi as stakerAbi} from '../abi/V3Staker.json'
+//import { address as stakerAddress, abi as stakerAbi} from '../abi/V3Staker.json'
 
 
 import { address as wethAddress, abi as wethAbi } from "../abi/WETH.json"
@@ -26,7 +26,7 @@ const VITAWETH ="0xcBcC3cBaD991eC59204be2963b4a87951E4d292B"
 describe("Mimisbrunnr", async () => {
     let accounts: hre.ethers.Signer[];
     let mimisbrunnr: Mimisbrunnr;
-    
+    let staker: Staker;
     let uniswapFactory: hre.ethers.Contract;
     let swapRouter: hre.ethers.Contract;
     let nfpm: hre.ethers.Contract;
@@ -47,12 +47,14 @@ describe("Mimisbrunnr", async () => {
 
     before(async () => {
         accounts = await hre.ethers.getSigners()
-        const mimisbrunnrAddr = await main()
-        mimisbrunnr  = await hre.ethers.getContractAt("Mimisbrunnr", mimisbrunnrAddr)
+        const {mimisAddr, stakerAddr, poolAddr } = await main()
+        mimisbrunnr  = await hre.ethers.getContractAt("Mimisbrunnr", mimisAddr)
+        staker =  await hre.ethers.getContractAt("Staker", stakerAddr)
+        mimisWethPool = new hre.ethers.Contract(poolAddr, poolAbi, accounts[0])
+
         uniswapFactory = new hre.ethers.Contract(factoryAddress, factoryAbi, accounts[0]) 
         nfpm = new hre.ethers.Contract(nfpmAddress, nfpmAbi, accounts[0])
         swapRouter = new hre.ethers.Contract(swapAddress, swapAbi, accounts[0])
-        v3Staker = new hre.ethers.Contract(stakerAddress, stakerAbi, accounts[0])
 
         weth = new hre.ethers.Contract(wethAddress, wethAbi, accounts[0])
         rsc = new hre.ethers.Contract(rscAddress, rscAbi, accounts[0])
@@ -71,6 +73,14 @@ describe("Mimisbrunnr", async () => {
         
     })
 
+    it("initializes the MIMISWETH pool", async () => {
+        const sqrtPriceX96 = 1n * 2n ** 96n
+        console.log(sqrtPriceX96)
+        const initTx = await mimisWethPool.initialize(
+           sqrtPriceX96 
+        )
+        await initTx.wait()
+    })
 
     it("should create the initial mimis positions", async () => {
         const createMimisPosition  = async (
@@ -268,7 +278,7 @@ describe("Mimisbrunnr", async () => {
         const zapMimis = async (
             token:hre.ethers.Contract,
             pool: hre.ethers.Contract,
-            wethAmount:number
+            wethAmount:number | BigInt
         ) => {
             const depositAmount = hre.ethers.parseUnits(String(2*wethAmount), 'ether')
             wethAmount = hre.ethers.parseUnits(String(wethAmount), 'ether')
@@ -342,33 +352,6 @@ describe("Mimisbrunnr", async () => {
             expect(totalProtocolLiquidity).to.be.equal(totalSupply+4n)
     })
 
-    it("initializes the MIMISWETH pool", async () => {
-        console.log(await mimisbrunnr.getAddress())
-        const pooltx = await uniswapFactory.createPool(
-            await mimisbrunnr.getAddress(),
-            wethAddress,
-            10000
-        )
-        await pooltx.wait()
-
-        const poolAddr = await uniswapFactory.getPool(
-            await mimisbrunnr.getAddress(),
-            wethAddress,
-            10000
-        )
-        const setPooltx = await mimisbrunnr.setMimisPool(
-            poolAddr
-        )
-        await setPooltx.wait()
-        mimisWethPool = new hre.ethers.Contract(poolAddr, poolAbi, accounts[0])
-
-        const sqrtPriceX96 = 1n * 2n ** 96n
-        console.log(sqrtPriceX96)
-        const initTx = await mimisWethPool.initialize(
-           sqrtPriceX96 
-        )
-        await initTx.wait()
-    })
     
     it("should provide initial liquidity", async () => {
         const initialTokenAmount = await hre.ethers.parseUnits('10', 'ether')
@@ -403,14 +386,9 @@ describe("Mimisbrunnr", async () => {
 
     })
 
-    it("should create incentive in uniswap v3 staker", async () => {
-        const rscIncentive = await v3Staker.createIncentive({
-            rewardToken: rscAddress,
-            poolAddress:  RSCWETH,
-            startTime: Math.floor(new Date().getTime() / 1000),
-            endTime: Math.floor(new Date().getTime() / 1000) + (365 * 24 * 60 * 60),
-            totalReward: await mimisbrunnr.getAddress()
-        })
+    it("trigger swaps for fees in rsc pool", async () => {
+
+
     })
 
 })

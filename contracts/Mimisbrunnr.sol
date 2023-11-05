@@ -17,7 +17,7 @@ interface IERC20Decimals is IERC20 {
 
 
 contract Mimisbrunnr is ERC20 {
-    address STAKER;
+    address STAKER = address(0);
 
     struct PoolParams  {
         address pool;
@@ -244,7 +244,6 @@ contract Mimisbrunnr is ERC20 {
        uint128 initialProtocolOwnedLiquidity = totalProtocolOwnedLiquidity;
        for (uint i =0; i< poolAddrs.length; i++) {
             PoolParams memory poolParams = pools[poolAddrs[i]];
-            
             console.log('totol pool liquidity    :', poolParams.protocolOwnedLiquidity);
             console.log('total Protocol Liquidity:', totalProtocolOwnedLiquidity);
             uint256 calcedLiquidity = FullMath.mulDiv(amount, uint256(poolParams.protocolOwnedLiquidity), uint256(initialProtocolOwnedLiquidity));
@@ -284,12 +283,24 @@ contract Mimisbrunnr is ERC20 {
                 if (colAmount0 > amount0) {
                     uint256 fee = FullMath.mulDiv(colAmount0 - amount0, protocolFee, 1000000);
                     uint256 amountToReward = colAmount0 - amount0 - fee;
-                    (poolParams.wethIsToken0 ? IERC20(WETH).transfer(STAKER, amountToReward) : IERC20(poolAddrs[i]).transfer(STAKER, amountToReward));
+                    if (poolParams.wethIsToken0) {
+                        IERC20(WETH).transfer(STAKER, amountToReward);
+                        IStaker(STAKER).fundIncentive(WETH, amountToReward);
+                    } else {
+                        IERC20(poolAddrs[i]).transfer(STAKER, amountToReward);
+                        IStaker(STAKER).fundIncentive(poolAddrs[i], amountToReward);
+                    }
                 }
                 if (colAmount1 > amount1) {
-                    uint256 fee = FullMath.mulDiv(colAmount0 - amount0, protocolFee, 1000000);
-                    uint256 amountToReward = colAmount0 - amount0 - fee;
-                    (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(STAKER, amountToReward) : IERC20(poolAddrs[i]).transfer(STAKER, amountToReward));
+                    uint256 fee = FullMath.mulDiv(colAmount1 - amount1, protocolFee, 1000000);
+                    uint256 amountToReward = colAmount1 - amount1 - fee;
+                    if (poolParams.wethIsToken0) {
+                        IERC20(poolAddrs[i]).transfer(STAKER, amountToReward);
+                        IStaker(STAKER).fundIncentive(poolAddrs[i], amountToReward);
+                    } else {
+                        IERC20(WETH).transfer(STAKER, amountToReward);
+                        IStaker(STAKER).fundIncentive(WETH, amountToReward);
+                    }
                 }
             }
        }

@@ -1,14 +1,41 @@
 import hre from 'hardhat'
 import * as fs from 'node:fs'
 import MimisBrunnr from '../artifacts/contracts/Mimisbrunnr.sol/Mimisbrunnr.json'
-export async function main() {
 
+import { address as factoryAddress, abi as factoryAbi } from "../abi/UniswapV3Factory.json"
+import {abi as poolAbi} from "../abi/UniswapV3Pool.json"
+import { address as wethAddress, abi as wethAbi } from "../abi/WETH.json"
+
+export async function main() {
+  const signers = await hre.ethers.getSigners();
   const mimisbrunnr = await hre.ethers.deployContract(
     "Mimisbrunnr", []
     );
 
   await mimisbrunnr.waitForDeployment();
-  console.log(await mimisbrunnr.getAddress())
+  const mimisaddr = await mimisbrunnr.getAddress()
+
+  const factory = new hre.ethers.Contract(
+    factoryAddress,
+    factoryAbi,
+    signers[0]
+  )
+
+  const pooltx = await factory.createPool(
+      await mimisbrunnr.getAddress(),
+      wethAddress,
+      10000
+  )
+  await pooltx.wait()
+
+  const poolAddr = await factory.getPool(
+      mimisaddr,
+      wethAddress,
+      10000
+  )
+
+  const staker = await hre.ethers.deployContract("Staker",[mimisaddr, poolAddr])
+  await mimisbrunnr.setStakingContract(await staker.getAddress())
 
   fs.writeFile('./abi/MimisbrunnrV2.json', JSON.stringify({
     address: await mimisbrunnr.getAddress(),
@@ -18,7 +45,11 @@ export async function main() {
       console.log(err)
     }
   });
-  return await mimisbrunnr.getAddress()
+  return { 
+    mimisAddr: await mimisbrunnr.getAddress(),
+    stakerAddr: await staker.getAddress(),
+    poolAddr: poolAddr
+  }
  
 }
 
