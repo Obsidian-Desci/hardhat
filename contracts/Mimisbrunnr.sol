@@ -244,15 +244,15 @@ contract Mimisbrunnr is ERC20 {
        uint128 initialProtocolOwnedLiquidity = totalProtocolOwnedLiquidity;
        for (uint i =0; i< poolAddrs.length; i++) {
             PoolParams memory poolParams = pools[poolAddrs[i]];
-            console.log('totol pool liquidity    :', poolParams.protocolOwnedLiquidity);
-            console.log('total Protocol Liquidity:', totalProtocolOwnedLiquidity);
+            //console.log('totol pool liquidity    :', poolParams.protocolOwnedLiquidity);
+            //console.log('total Protocol Liquidity:', totalProtocolOwnedLiquidity);
             uint256 calcedLiquidity = FullMath.mulDiv(amount, uint256(poolParams.protocolOwnedLiquidity), uint256(initialProtocolOwnedLiquidity));
-            console.log('calcledliquidity', calcedLiquidity);
-            console.log('uint128(calcedliquidity)', uint128(calcedLiquidity));
+            //console.log('calcledliquidity', calcedLiquidity);
+            //console.log('uint128(calcedliquidity)', uint128(calcedLiquidity));
             if (calcedLiquidity == 0) {
-                console.log('liquidity is zero for this pair, skipping');
+                //console.log('liquidity is zero for this pair, skipping');
             } else {
-                console.log('1');
+                //console.log('1');
                 INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseParams =
                 INonfungiblePositionManager.DecreaseLiquidityParams({
                     tokenId: poolParams.mimisPosition,
@@ -263,7 +263,7 @@ contract Mimisbrunnr is ERC20 {
                 });
                 (uint256 amount0, uint256 amount1) = infpm.decreaseLiquidity(decreaseParams);
 
-                console.log('2');
+                //console.log('2');
                 INonfungiblePositionManager.CollectParams memory collectParams =
                 INonfungiblePositionManager.CollectParams({
                     tokenId: poolParams.mimisPosition,

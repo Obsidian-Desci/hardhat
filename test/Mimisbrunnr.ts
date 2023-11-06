@@ -37,7 +37,8 @@ describe("Mimisbrunnr", async () => {
     let hair: hre.ethers.Contract;
     let lake: hre.ethers.Contract;
     let vita: hre.ethers.Contract;
-    
+
+    let tokenArray: hre.ethers.Contract;
     let mimisWethPool: hre.ethers.Contract;
     let rscWethPool: hre.ethers.Contract;
     let growWethPool: hre.ethers.Contract;
@@ -45,6 +46,7 @@ describe("Mimisbrunnr", async () => {
     let lakeWethPool: hre.ethers.Contract;
     let vitaWethPool: hre.ethers.Contract;
 
+    let nftIdToUnstake
     before(async () => {
         accounts = await hre.ethers.getSigners()
         const {mimisAddr, stakerAddr, poolAddr } = await main()
@@ -63,12 +65,20 @@ describe("Mimisbrunnr", async () => {
         vita = new hre.ethers.Contract(vitaAddress, vitaAbi, accounts[0])
         lake = new hre.ethers.Contract(lakeAddress, lakeAbi, accounts[0])
 
+
         rscWethPool = new hre.ethers.Contract(RSCWETH, poolAbi, accounts[0])
         hairWethPool = new hre.ethers.Contract(HAIRWETH, poolAbi, accounts[0])
         growWethPool = new hre.ethers.Contract(GROWWETH, poolAbi, accounts[0])
         vitaWethPool = new hre.ethers.Contract(VITAWETH, poolAbi, accounts[0])
         lakeWethPool = new hre.ethers.Contract(LAKEWETH, poolAbi, accounts[0])
 
+        tokenArray = [
+            {token:rsc, pool:rscWethPool},
+            {token:grow, pool:growWethPool},
+            {token:hair, pool:hairWethPool},
+            {token:vita, pool:vitaWethPool},
+            {token:lake, pool:lakeWethPool}
+        ]
 
         
     })
@@ -383,12 +393,138 @@ describe("Mimisbrunnr", async () => {
             recipient: accounts[0].address,
             deadline: Math.floor(new Date().getTime() / 1000) + 3600
         })
+        const filterTransfer =  nfpm.filters.Transfer()
+        const eventsTransfer = await nfpm.queryFilter(
+            filterTransfer,
+            (await hre.ethers.provider.getBlockNumber()) - 1, 
+            (await hre.ethers.provider.getBlockNumber())
+        )
+        nftIdToUnstake = eventsTransfer[0].args[2]
 
+        await nfpm.safeTransferFrom(accounts[0].address, await staker.getAddress(), nftIdToUnstake)
     })
 
-    it("trigger swaps for fees in rsc pool", async () => {
+    it("conducts swap party to generate tx fees and advance the block time", async () => {
+
+        const swapParty = async (account) => {
+            for await (const {token,pool} of tokenArray) {
+                console.log('swap party:', await token.symbol())
+                const wethAmount = hre.ethers.parseUnits('1', 'ether')
+                await (await weth.connect(account).deposit({value: wethAmount})).wait()
+                console.log('weth balance:', await weth.balanceOf(account.address))
+                await weth.connect(account).approve(await swapRouter.getAddress(), wethAmount)
+                //console.log('weth swap approve', await weth.allowance(account.address, swapRouter.address))
+                const swap = await swapRouter.connect(account).exactInputSingle({
+                    tokenIn: wethAddress,
+                    tokenOut: await token.getAddress(),
+                    fee: await pool.fee(),
+                    recipient: account.address,
+                    deadline: Math.floor(new Date().getTime() / 1000) + 3600,
+                    amountIn: wethAmount,
+                    amountOutMinimum: 0,
+                    sqrtPriceLimitX96: 0
+                })
+                console.log('weth in')
+                await swap.wait()
+                await (await token.connect(account).approve(await swapRouter.getAddress(), await token.balanceOf(account.address))).wait()
+                const swapBack = await swapRouter.connect(account).exactInputSingle({
+                    tokenIn: await token.getAddress(),
+                    tokenOut: wethAddress,
+                    fee: await pool.fee(),
+                    recipient: account.address,
+                    deadline: Math.floor(new Date().getTime() / 1000) + 3600,
+                    amountIn: (await token.balanceOf(account.address)) / 2n,
+                    amountOutMinimum: 0,
+                    sqrtPriceLimitX96: 0
+                })
+                await swapBack.wait()
+                console.log('token in')
+                await hre.network.provider.send("evm_increaseTime", [3600])
+
+            }
+        }
+        let j=0
+        while( j<10 ) {
+            await swapParty(accounts[j + 1])
+            j++
+        }
+        console.log('======staker balances======')
+        /*
+        function StakerBalance ({symbol, balance, unclaimedReward}) {
+            this.symbol = symbol
+            this.balance = balance
+            this.unclaimedReward = unclaimedReward
+        }
+        const createStakerBalance = async (token) => {
+            const symbol = await token.symbol()
+            const balance = await token.balanceOf(await staker.getAddress())
+            const incentiveKey = await staker.incentiveKeys(await token.getAddress())
+            const incentive = await staker.incentives(incentiveKey)
+            const unclaimedReward = incentive.totalRewardUnclaimed
+            return {symbol, balance, unclaimedReward}
+        }
+        console.table([
+             new StakerBalance(await createStakerBalance(rsc)),
+             new StakerBalance(await createStakerBalance(grow)),
+             new StakerBalance(await createStakerBalance(hair)),
+             new StakerBalance(await createStakerBalance(vita)),
+             new StakerBalance(await createStakerBalance(lake)),
+             new StakerBalance(await createStakerBalance(weth))
+        ])
+
+        */
+        function AccountBalances ({account, balanceMim, balanceWeth, balanceRsc, balanceGrow, balanceHair, balanceVita, balanceLake}) {
+            this.account = `${account.substring(0, 6)}...${account.substring(account.length - 4)}`
+            this.mimis =  balanceMim
+            this.Weth = balanceWeth
+            this.rsc = balanceRsc
+            this.grow = balanceGrow
+            this.hair = balanceHair
+            this.vita = balanceVita
+            this.lake = balanceLake
+        }
+
+        const createAccountBalances = async (account) => {
+            const balanceMim = await mimisbrunnr.balanceOf(account)
+            const balanceWeth = await weth.balanceOf(account)
+            const balanceRsc = await rsc.balanceOf(account)
+            const balanceGrow = await grow.balanceOf(account)
+            const balanceHair = await hair.balanceOf(account)
+            const balanceVita = await vita.balanceOf(account)
+            const balanceLake = await lake.balanceOf(account)
+            return new AccountBalances({account, balanceMim, balanceWeth, balanceRsc, balanceGrow, balanceHair, balanceVita, balanceLake})
+        }
 
 
+        console.table([
+            await createAccountBalances(accounts[0].address),
+            //await createAccountBalances(accounts[1].address),
+            //await createAccountBalances(accounts[2].address),
+            //await createAccountBalances(accounts[3].address),
+            //await createAccountBalances(accounts[4].address),
+            //await createAccountBalances(accounts[5].address),
+            //await createAccountBalances(accounts[6].address),
+        ])
+        console.log('attempting to unwrap mimis')
+        const unwrapTx = await mimisbrunnr.unwrapMimis(
+            hre.ethers.parseUnits('140.22434782', 'ether')
+        )
+
+        console.table([
+            await createAccountBalances(accounts[0].address)
+        ])
+
+        await staker.unstakeToken(nftIdToUnstake)
+        /*
+        console.table([
+             new StakerBalance(await createStakerBalance(rsc)),
+             new StakerBalance(await createStakerBalance(grow)),
+             new StakerBalance(await createStakerBalance(hair)),
+             new StakerBalance(await createStakerBalance(vita)),
+             new StakerBalance(await createStakerBalance(lake)),
+             new StakerBalance(await createStakerBalance(weth))
+        ])
+        */
     })
 
 })
