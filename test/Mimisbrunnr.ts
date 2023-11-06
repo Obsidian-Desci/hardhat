@@ -244,6 +244,7 @@ describe("Mimisbrunnr", async () => {
         expect(totalProtocolLiquidity).to.be.equal(totalSupply)
 
 
+
     })
 
     it("should unwrap mims", async () => {
@@ -345,11 +346,11 @@ describe("Mimisbrunnr", async () => {
 
         }
 
-            await zapMimis(rsc, rscWethPool, 0.1)
-            await zapMimis(grow, growWethPool, 0.1)
-            await zapMimis(hair, hairWethPool, 0.1)
-            await zapMimis(vita, vitaWethPool, 0.1)
-            await zapMimis(lake, lakeWethPool, 0.1)
+            await zapMimis(rsc, rscWethPool, 10)
+            await zapMimis(grow, growWethPool, 10)
+            await zapMimis(hair, hairWethPool,10)
+            await zapMimis(vita, vitaWethPool, 10)
+            await zapMimis(lake, lakeWethPool, 10)
 
             const totalSupply = await mimisbrunnr.totalSupply()
             const totalProtocolLiquidity = await mimisbrunnr.totalProtocolOwnedLiquidity()
@@ -360,6 +361,11 @@ describe("Mimisbrunnr", async () => {
             const lakeLiquidity = (await mimisbrunnr.pools(await lake.getAddress())).protocolOwnedLiquidity
             expect(rscLiquidity+growLiquidity+hairLiquidity+vitaLiquidity+lakeLiquidity).to.equal(totalProtocolLiquidity)
             expect(totalProtocolLiquidity).to.be.equal(totalSupply+4n)
+
+
+            const liquidity = await mimisWethPool.liquidity()
+            console.log('mimisWeth Liquidity', liquidity)
+
     })
 
     
@@ -379,20 +385,24 @@ describe("Mimisbrunnr", async () => {
             initialTokenAmount
         )
         await mimisbrunnrApproveTx.wait() 
-
+        const token0 = await mimisWethPool.token0()
         const minttx = await nfpm.mint({
-            token0: await mimisbrunnr.getAddress(),
-            token1: wethAddress,
-            fee: 10000,
+            token0: await mimisWethPool.token0(),
+            token1: await mimisWethPool.token1(),
+            fee: await mimisWethPool.fee(),
             tickLower: Math.ceil(-887272 / 200) * 200,
             tickUpper: Math.floor(887272 / 200) * 200,
-            amount0Desired: await mimisbrunnr.balanceOf(accounts[0].address),
-            amount1Desired: initialTokenAmount,
+            amount0Desired: (token0 === await mimisbrunnr.getAddress() ? await mimisbrunnr.balanceOf(accounts[0].address): initialTokenAmount),
+            amount1Desired: (token0 !== await mimisbrunnr.getAddress() ? await mimisbrunnr.balanceOf(accounts[0].address): initialTokenAmount),
             amount0Min: 0,
             amount1Min: 0,
             recipient: accounts[0].address,
             deadline: Math.floor(new Date().getTime() / 1000) + 3600
         })
+        await minttx.wait()
+
+        const liquidity = await mimisWethPool.liquidity()
+        console.log('mimisWeth Liquidity', liquidity)
         const filterTransfer =  nfpm.filters.Transfer()
         const eventsTransfer = await nfpm.queryFilter(
             filterTransfer,
@@ -400,18 +410,19 @@ describe("Mimisbrunnr", async () => {
             (await hre.ethers.provider.getBlockNumber())
         )
         nftIdToUnstake = eventsTransfer[0].args[2]
-
-        await nfpm.safeTransferFrom(accounts[0].address, await staker.getAddress(), nftIdToUnstake)
+        console.log('position', await nfpm.positions(nftIdToUnstake))
+        console.log('mimis addr', await mimisbrunnr.getAddress())
+        console.log('mimisWethAddr', await mimisWethPool.getAddress())
+        console.log('params', accounts[0].address, await staker.getAddress(), nftIdToUnstake)
+        await nfpm["safeTransferFrom(address,address,uint256,bytes)"](accounts[0].address, await staker.getAddress(), nftIdToUnstake, "0x00")
     })
 
     it("conducts swap party to generate tx fees and advance the block time", async () => {
 
         const swapParty = async (account) => {
             for await (const {token,pool} of tokenArray) {
-                console.log('swap party:', await token.symbol())
                 const wethAmount = hre.ethers.parseUnits('1', 'ether')
                 await (await weth.connect(account).deposit({value: wethAmount})).wait()
-                console.log('weth balance:', await weth.balanceOf(account.address))
                 await weth.connect(account).approve(await swapRouter.getAddress(), wethAmount)
                 //console.log('weth swap approve', await weth.allowance(account.address, swapRouter.address))
                 const swap = await swapRouter.connect(account).exactInputSingle({
@@ -424,7 +435,6 @@ describe("Mimisbrunnr", async () => {
                     amountOutMinimum: 0,
                     sqrtPriceLimitX96: 0
                 })
-                console.log('weth in')
                 await swap.wait()
                 await (await token.connect(account).approve(await swapRouter.getAddress(), await token.balanceOf(account.address))).wait()
                 const swapBack = await swapRouter.connect(account).exactInputSingle({
@@ -438,7 +448,6 @@ describe("Mimisbrunnr", async () => {
                     sqrtPriceLimitX96: 0
                 })
                 await swapBack.wait()
-                console.log('token in')
                 await hre.network.provider.send("evm_increaseTime", [3600])
 
             }
@@ -513,8 +522,10 @@ describe("Mimisbrunnr", async () => {
         console.table([
             await createAccountBalances(accounts[0].address)
         ])
-
-        await staker.unstakeToken(nftIdToUnstake)
+        console.log(await staker.getRewardInfo(
+            await rsc.getAddress(), nftIdToUnstake
+        ))
+        //await staker.unstakeToken(await rsc.getAddress(), nftIdToUnstake)
         /*
         console.table([
              new StakerBalance(await createStakerBalance(rsc)),

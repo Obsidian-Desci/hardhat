@@ -4,9 +4,8 @@ pragma solidity 0.8.20;
 import '@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
-
-import '@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol';
-
+import './PoolAddressPatch.sol';
+import "hardhat/console.sol";
 /// @notice Encapsulates the logic for getting info about a NFT token ID
 library NFTPositionInfo {
     /// @param factory The address of the Uniswap V3 Factory used in computing the pool address
@@ -36,12 +35,15 @@ library NFTPositionInfo {
         (, , token0, token1, fee, tickLower, tickUpper, liquidity, , , , ) = nonfungiblePositionManager.positions(
             tokenId
         );
-
+        console.log('token0', token0);
+        console.log('token1', token1);
+        console.log('fee', fee);
         pool = IUniswapV3Pool(
-            PoolAddress.computeAddress(
+            PoolAddressPatch.computeAddress(
                 address(factory),
-                PoolAddress.PoolKey({token0: token0, token1: token1, fee: fee})
+                PoolAddressPatch.PoolKey({token0: token0, token1: token1, fee: fee})
             )
         );
+        console.log('calced pool', address(pool));
     }
 }

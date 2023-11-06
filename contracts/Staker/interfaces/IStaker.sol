@@ -131,10 +131,10 @@ interface IStaker is IERC721Receiver {
     ) external returns (uint256 reward);
 
     /// @notice Calculates the reward amount that will be received for the given stake
-    /// @param key The key of the incentive
+    /// @param token The address of the token to be rewarded 
     /// @param tokenId The ID of the token
     /// @return reward The reward accrued to the NFT for the given incentive thus far
-    function getRewardInfo(IncentiveKey memory key, uint256 tokenId)
+    function getRewardInfo(address token, uint256 tokenId)
         external
         returns (uint256 reward, uint160 secondsInsideX128);
 
