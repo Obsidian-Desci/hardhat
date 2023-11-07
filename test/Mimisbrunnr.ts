@@ -448,7 +448,7 @@ describe("Mimisbrunnr", async () => {
                     sqrtPriceLimitX96: 0
                 })
                 await swapBack.wait()
-                await hre.network.provider.send("evm_increaseTime", [3600])
+                await hre.network.provider.send("evm_increaseTime", [3600*2])
 
             }
         }
@@ -518,14 +518,29 @@ describe("Mimisbrunnr", async () => {
         const unwrapTx = await mimisbrunnr.unwrapMimis(
             hre.ethers.parseUnits('140.22434782', 'ether')
         )
-
+        console.log('===============unstake=============')
         console.table([
-            await createAccountBalances(accounts[0].address)
+            await createAccountBalances(accounts[0].address),
+            await createAccountBalances(await staker.getAddress())
         ])
-        console.log(await staker.getRewardInfo(
+        const rewardInfo = await staker.getRewardInfo(
             await rsc.getAddress(), nftIdToUnstake
-        ))
-        //await staker.unstakeToken(await rsc.getAddress(), nftIdToUnstake)
+        )
+        console.log('rewardInfo', rewardInfo)
+        await (await staker.unstakeToken(nftIdToUnstake)).wait()
+       await ( await staker.claimReward(
+            await rsc.getAddress(),
+            accounts[0].address,
+            rewardInfo[0]
+        )).wait()
+        
+
+        /*
+        */
+        console.table([
+            await createAccountBalances(accounts[0].address),
+            await createAccountBalances(await staker.getAddress())
+        ])
         /*
         console.table([
              new StakerBalance(await createStakerBalance(rsc)),
