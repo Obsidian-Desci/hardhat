@@ -120,15 +120,11 @@ interface IStaker is IERC721Receiver {
     function unstakeToken(uint256 tokenId) external;
 
     /// @notice Transfers `amountRequested` of accrued `rewardToken` rewards from the contract to the recipient `to`
-    /// @param rewardToken The token being distributed as a reward
     /// @param to The address where claimed rewards will be sent to
-    /// @param amountRequested The amount of reward tokens to claim. Claims entire reward amount if set to 0.
-    /// @return reward The amount of reward tokens claimed
-    function claimReward(
-        IERC20Minimal rewardToken,
-        address to,
-        uint256 amountRequested
-    ) external returns (uint256 reward);
+    /// @return issuedRewards The amount of reward tokens claimed
+    function claimRewards(
+        address to
+    ) external returns (uint256[] memory issuedRewards);
 
     /// @notice Calculates the reward amount that will be received for the given stake
     /// @param token The address of the token to be rewarded 

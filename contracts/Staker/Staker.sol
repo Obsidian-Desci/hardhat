@@ -318,20 +318,19 @@ contract Staker is IStaker {
             }
     }
 
-    function claimReward(
-        IERC20Minimal rewardToken,
-        address to,
-        uint256 amountRequested
-    ) external override returns (uint256 reward) {
-        reward = rewards[rewardToken][msg.sender];
-        if (amountRequested != 0 && amountRequested < reward) {
-            reward = amountRequested;
+    function claimRewards(
+        address to
+    ) external returns (uint256[] memory) {
+        uint256[] memory issuedRewards = new uint256[](tokenArray.length);
+        for (uint i = 0; i < tokenArray.length; i++) {
+            IERC20Minimal rewardToken = IERC20Minimal(tokenArray[i]);
+            uint256 reward = rewards[rewardToken][msg.sender];
+            rewards[rewardToken][msg.sender] -= reward;
+            TransferHelperExtended.safeTransfer(address(rewardToken), to, reward);
+            emit RewardClaimed(to, reward);
+            issuedRewards[i] = reward;  
         }
-
-        rewards[rewardToken][msg.sender] -= reward;
-        TransferHelperExtended.safeTransfer(address(rewardToken), to, reward);
-
-        emit RewardClaimed(to, reward);
+        return issuedRewards;
     }
 
     function getRewardInfo(address token, uint256 tokenId)

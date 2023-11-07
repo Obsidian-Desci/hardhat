@@ -231,7 +231,6 @@ contract Mimisbrunnr is ERC20 {
         );
         //deposits[msg.sender][address(pool)] += liquidityAdded;
         pools[(wethIsToken0 ? token1: token0)].protocolOwnedLiquidity += liquidityAdded;
-        console.log('sellLP:liquidityAdded', liquidityAdded);
         totalProtocolOwnedLiquidity += liquidityAdded;
         infpm.burn(erc721Id);
         _mint(msg.sender, liquidityAdded);
