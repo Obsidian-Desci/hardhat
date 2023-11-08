@@ -28,15 +28,25 @@ export async function main() {
   )
   await pooltx.wait()
 
+  const sqrtPriceX96 = 1n * 2n ** 96n
   const poolAddr = await factory.getPool(
       mimisaddr,
       wethAddress,
       10000
   )
 
+  const pool = new hre.ethers.Contract(
+      poolAddr, poolAbi, signers[0]
+  )
+
+  const initTx = await pool.initialize(
+      sqrtPriceX96
+  )
+  await initTx.wait()
+
   const staker = await hre.ethers.deployContract("Staker",[mimisaddr, poolAddr])
   await mimisbrunnr.setStakingContract(await staker.getAddress())
-
+  console.log('mimisbrunnr addr', await mimisbrunnr.getAddress())
   fs.writeFile('./abi/MimisbrunnrV2.json', JSON.stringify({
     address: await mimisbrunnr.getAddress(),
     abi:MimisBrunnr.abi

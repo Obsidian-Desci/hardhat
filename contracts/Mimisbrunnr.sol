@@ -237,11 +237,13 @@ contract Mimisbrunnr is ERC20 {
         IUniswapV3Pool pool = IUniswapV3Pool(poolParams.pool);
         
         infpm.transferFrom(msg.sender, address(this), erc721Id);
+        console.log('transfered');
         uint128 liquidityAdded = mergeLiquidity(
             erc721Id,
             poolParams.mimisPosition,
             liquidity
         );
+        console.log('merge failed, probably no pool');
         //deposits[msg.sender][address(pool)] += liquidityAdded;
         pools[(wethIsToken0 ? token1: token0)].protocolOwnedLiquidity += liquidityAdded;
         totalProtocolOwnedLiquidity += liquidityAdded;

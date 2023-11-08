@@ -1,6 +1,6 @@
 import hre from 'hardhat'
 import * as fs from 'node:fs'
-import { address as mimisAddress, abi as mimisAbi } from '../abi/Mimisbrunnr.json'
+import { address as mimisAddress, abi as mimisAbi } from '../abi/MimisbrunnrV2.json'
 import { address as wethAddress, abi as wethAbi } from "../abi/WETH.json"
 import { address as rscAddress, abi as rscAbi } from "../abi/RSC.json"
 import { address as growAddress, abi as growAbi } from "../abi/GROW.json"
@@ -67,6 +67,7 @@ export async function main() {
 
     console.log('exact input single complete')
     const tokenAmount = await token.balanceOf(signers[0].address)
+    await (await token.approve(nfpmAddress, 0)).wait()
     const tokenapprovetx = await token.approve(nfpmAddress, tokenAmount)
     await tokenapprovetx.wait()
     //const deposit2tx = await weth.deposit({ value: wethAmount })
@@ -85,8 +86,14 @@ export async function main() {
       fee: await pool.fee(),
       tickLower: Math.ceil(-887272 / tickSpacing) * tickSpacing,
       tickUpper: Math.floor(887272 / tickSpacing) * tickSpacing,
-      amount0Desired: wethAmount,
-      amount1Desired: tokenAmount,
+      amount0Desired: (
+        hre.ethers.getAddress(await pool.token0()) == 
+        hre.ethers.getAddress(await weth.getAddress())
+        ) ? wethAmount : tokenAmount,
+      amount1Desired: (
+        hre.ethers.getAddress(await pool.token1()) ==
+        hre.ethers.getAddress(await weth.getAddress())
+        ) ? wethAmount : tokenAmount,
       amount0Min: 0,
       amount1Min: 0,
       recipient: await mimisbrunnr.getAddress(),
