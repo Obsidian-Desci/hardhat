@@ -151,6 +151,19 @@ contract Mimisbrunnr is ERC20 {
         setMimisPositionForToken(token, poolParams.mimisPosition);
     }
 
+    function removePool(address token) public {
+        require(msg.sender == operator, "only callable by owner");
+        infpm.transferFrom(address(this), operator, pools[token].mimisPosition);
+        totalProtocolOwnedLiquidity -= pools[token].protocolOwnedLiquidity;
+        delete pools[token];
+        for (uint i=0; i< poolAddrs.length;i++) {
+            if (poolAddrs[i] == token) {
+                poolAddrs[i] = poolAddrs[poolAddrs.length-1];
+                poolAddrs.pop();
+            }
+        }
+    }
+
     function setMimisPositionForToken(address token, uint256 tokenId) public {
         require(msg.sender == operator, "only callable by owner");
         pools[token].mimisPosition = tokenId;
