@@ -7,7 +7,6 @@ import "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.s
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 import '@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Factory.sol';
-import "hardhat/console.sol";
 import '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 import '@uniswap/v3-core/contracts/libraries/FullMath.sol';
 import "./Staker/interfaces/IStaker.sol";
@@ -151,19 +150,6 @@ contract Mimisbrunnr is ERC20 {
         setMimisPositionForToken(token, poolParams.mimisPosition);
     }
 
-    function removePool(address token) public {
-        require(msg.sender == operator, "only callable by owner");
-        infpm.transferFrom(address(this), operator, pools[token].mimisPosition);
-        totalProtocolOwnedLiquidity -= pools[token].protocolOwnedLiquidity;
-        delete pools[token];
-        for (uint i=0; i< poolAddrs.length;i++) {
-            if (poolAddrs[i] == token) {
-                poolAddrs[i] = poolAddrs[poolAddrs.length-1];
-                poolAddrs.pop();
-            }
-        }
-    }
-
     function setMimisPositionForToken(address token, uint256 tokenId) public {
         require(msg.sender == operator, "only callable by owner");
         pools[token].mimisPosition = tokenId;
@@ -237,13 +223,11 @@ contract Mimisbrunnr is ERC20 {
         IUniswapV3Pool pool = IUniswapV3Pool(poolParams.pool);
         
         infpm.transferFrom(msg.sender, address(this), erc721Id);
-        console.log('transfered');
         uint128 liquidityAdded = mergeLiquidity(
             erc721Id,
             poolParams.mimisPosition,
             liquidity
         );
-        console.log('merge failed, probably no pool');
         //deposits[msg.sender][address(pool)] += liquidityAdded;
         pools[(wethIsToken0 ? token1: token0)].protocolOwnedLiquidity += liquidityAdded;
         totalProtocolOwnedLiquidity += liquidityAdded;
@@ -258,15 +242,9 @@ contract Mimisbrunnr is ERC20 {
        uint128 initialProtocolOwnedLiquidity = totalProtocolOwnedLiquidity;
        for (uint i =0; i< poolAddrs.length; i++) {
             PoolParams memory poolParams = pools[poolAddrs[i]];
-            //console.log('totol pool liquidity    :', poolParams.protocolOwnedLiquidity);
-            //console.log('total Protocol Liquidity:', totalProtocolOwnedLiquidity);
             uint256 calcedLiquidity = FullMath.mulDiv(amount, uint256(poolParams.protocolOwnedLiquidity), uint256(initialProtocolOwnedLiquidity));
-            //console.log('calcledliquidity', calcedLiquidity);
-            //console.log('uint128(calcedliquidity)', uint128(calcedLiquidity));
             if (calcedLiquidity == 0) {
-                //console.log('liquidity is zero for this pair, skipping');
             } else {
-                //console.log('1');
                 INonfungiblePositionManager.DecreaseLiquidityParams memory decreaseParams =
                 INonfungiblePositionManager.DecreaseLiquidityParams({
                     tokenId: poolParams.mimisPosition,
@@ -277,7 +255,6 @@ contract Mimisbrunnr is ERC20 {
                 });
                 (uint256 amount0, uint256 amount1) = infpm.decreaseLiquidity(decreaseParams);
 
-                //console.log('2');
                 INonfungiblePositionManager.CollectParams memory collectParams =
                 INonfungiblePositionManager.CollectParams({
                     tokenId: poolParams.mimisPosition,
@@ -288,8 +265,6 @@ contract Mimisbrunnr is ERC20 {
                 (uint256 colAmount0, uint256 colAmount1) = infpm.collect(collectParams);
                 totalProtocolOwnedLiquidity -= uint128(calcedLiquidity);
                 pools[poolAddrs[i]].protocolOwnedLiquidity -= uint128(calcedLiquidity);
-                //console.log('liquidity decreased');
-                // unwrappers earn the tokens staked as LP
                 (poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount0) : IERC20(poolAddrs[i]).transfer(msg.sender, amount0));
                 (!poolParams.wethIsToken0 ? IERC20(WETH).transfer(msg.sender, amount1) : IERC20(poolAddrs[i]).transfer(msg.sender, amount1));
                 // Mimsbrunnr earns the rewards earned on the LP

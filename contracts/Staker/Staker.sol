@@ -6,7 +6,6 @@ import '@uniswap/v3-core/contracts/interfaces/IERC20Minimal.sol';
 import '@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol';
 ///import '@uniswap/v3-periphery/contracts/base/Multicall.sol';
 
-import "hardhat/console.sol";
 import "./interfaces/IStaker.sol";
 
 import "./libraries/IncentiveId.sol";
@@ -187,7 +186,6 @@ contract Staker is IStaker {
     }
 
     function fundIncentive(address token, uint256 amount) external {
-        console.log('msg.sender', msg.sender);
         require(msg.sender == owner || msg.sender == MIMIS, 'UniswapV3Staker::fundIncentive: not owner or mimis');
         IncentiveKey memory key = incentiveKeys[token];
         bytes32 id = IncentiveId.compute(key);
@@ -223,7 +221,6 @@ contract Staker is IStaker {
         uint256 tokenId,
         bytes calldata data
     ) external returns (bytes4) {
-        console.log('UniswapV3Staker::onERC721Received');
         require(
             msg.sender == address(nfpm),
             'UniswapV3Staker::onERC721Received: not a univ3 nft'
@@ -363,10 +360,7 @@ contract Staker is IStaker {
     }
 
     function _stakeToken(uint256 tokenId) private {
-        console.log('tokenId', tokenId);
-        console.log('UniswapV3Staker::_stakeToken');
         for (uint256 i = 0; i < tokenArray.length; i++) {
-            console.log('UniswapV3Staker::_stakeToken', i);
             IncentiveKey memory incentiveKey = incentiveKeys[tokenArray[i]];
             bytes32 id = IncentiveId.compute(incentiveKey);
             require(block.timestamp >= incentiveKey.startTime, 'UniswapV3Staker::stakeToken: incentive not started');
@@ -383,16 +377,12 @@ contract Staker is IStaker {
             );
             (IUniswapV3Pool pool, int24 tickLower, int24 tickUpper, uint128 liquidity) =
                 NFTPositionInfo.getPositionInfo(factory, nfpm, tokenId);
-                console.log('pool received');
             //require(pool == incentiveKey.pool, 'UniswapV3Staker::stakeToken: token pool is not the incentive pool');
             require(liquidity > 0, 'UniswapV3Staker::stakeToken: cannot stake token with 0 liquidity');
-            console.log('UniswapV3Staker::_stakeToke::pastRequire');   
 
             deposits[tokenId].numberOfStakes++;
             incentives[id].numberOfStakes++;
-            console.log('pool addr', address(pool));
             (, uint160 secondsPerLiquidityInsideX128, ) = pool.snapshotCumulativesInside(tickLower, tickUpper);
-            console.log('past cumulatives sinside');
             if (liquidity >= type(uint96).max) {
                 _stakes[tokenId][id] = Stake({
                     secondsPerLiquidityInsideInitialX128: secondsPerLiquidityInsideX128,

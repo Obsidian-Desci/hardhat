@@ -392,7 +392,7 @@ describe("Mimisbrunnr", async () => {
              new StakerBalance(await createStakerBalance(lake)),
              new StakerBalance(await createStakerBalance(weth))
         ])
-
     })
+
 })
 

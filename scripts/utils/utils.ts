@@ -195,3 +195,43 @@ export const createMimisPosition = async (
     const tokenId = await mintMimis(artifact, wethAmount, account, true)
     return tokenId
 }
+
+export function AccountBalances({ account, balanceMim, balanceWeth, balanceRsc, balanceGrow, balanceHair, balanceVita, balanceLake }) {
+        this.account = `${account.substring(0, 6)}...${account.substring(account.length - 4)}`
+        this.mimis = balanceMim
+        this.Weth = balanceWeth
+        this.rsc = balanceRsc
+        this.grow = balanceGrow
+        this.hair = balanceHair
+        this.vita = balanceVita
+        this.lake = balanceLake
+    }
+
+export const createAccountBalances = async (account) => {
+        const balanceMim = await mimisbrunnr.balanceOf(account)
+        const balanceWeth = await weth.balanceOf(account)
+        const balanceRsc = await rsc.balanceOf(account)
+        const balanceGrow = await grow.balanceOf(account)
+        const balanceHair = await hair.balanceOf(account)
+        const balanceVita = await vita.balanceOf(account)
+        const balanceLake = await lake.balanceOf(account)
+        return new AccountBalances({ account, balanceMim, balanceWeth, balanceRsc, balanceGrow, balanceHair, balanceVita, balanceLake })
+    }
+
+export function StakerBalance({ symbol, balance, unclaimedReward }) {
+        this.symbol = symbol
+        this.balance = balance
+        this.unclaimedReward = unclaimedReward
+    }
+
+export  const createStakerBalance = async (token) => {
+        const symbol = await token.symbol()
+        const balance = await token.balanceOf(await staker.getAddress())
+        const incentiveKey = await staker.incentiveKeys(await token.getAddress())
+        const encodedIncentiveKey = hre.ethers.AbiCoder.defaultAbiCoder().encode(
+            ['address', 'address', 'uint256', 'uint256', 'address'], incentiveKey);
+        const hashedIncentiveKey = hre.ethers.keccak256(encodedIncentiveKey);
+        const incentive = await staker.incentives(hashedIncentiveKey)
+        const unclaimedReward = incentive.totalRewardUnclaimed
+        return { symbol, balance, unclaimedReward }
+    }
