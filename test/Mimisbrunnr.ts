@@ -1,5 +1,7 @@
 import hre from 'hardhat'
 import { main } from '../scripts/deployMimisbrunnr'
+import { swapForDesciToken, mintMimis, mintMimisLP, createMimisPosition } from '../scripts/utils/utils'
+import * as ARTIFACTS from '../scripts/utils/artifacts'
 import { expect } from 'chai'
 import { address as factoryAddress, abi as factoryAbi } from "../abi/UniswapV3Factory.json"
 import { address as nfpmAddress, abi as nfpmAbi } from "../abi/NonFungiblePositionManager.json"
@@ -39,6 +41,7 @@ describe("Mimisbrunnr", async () => {
     let vita: hre.ethers.Contract;
 
     let tokenArray: hre.ethers.Contract;
+    let artifactsArray: ARTIFACTS.Artifact[];
     let mimisWethPool: hre.ethers.Contract;
     let rscWethPool: hre.ethers.Contract;
     let growWethPool: hre.ethers.Contract;
@@ -172,6 +175,7 @@ describe("Mimisbrunnr", async () => {
         vitaWethPool = new hre.ethers.Contract(VITAWETH, poolAbi, accounts[0])
         lakeWethPool = new hre.ethers.Contract(LAKEWETH, poolAbi, accounts[0])
 
+
         tokenArray = [
             { token: rsc, pool: rscWethPool },
             { token: grow, pool: growWethPool },
@@ -180,92 +184,22 @@ describe("Mimisbrunnr", async () => {
             { token: lake, pool: lakeWethPool }
         ]
 
+        artifactsArray = [
+            ARTIFACTS.RSC,
+            ARTIFACTS.GROW,
+            ARTIFACTS.HAIR,
+            ARTIFACTS.VITA,
+            ARTIFACTS.LAKE
+        ]
 
-    })
-
-    it("initializes the MIMISWETH pool", async () => {
-        const sqrtPriceX96 = 1n * 2n ** 96n
-        console.log(sqrtPriceX96)
-        const initTx = await mimisWethPool.initialize(
-            sqrtPriceX96
-        )
-        await initTx.wait()
     })
 
     it("should create the initial mimis positions", async () => {
-        const createMimisPosition = async (
-            token: hre.ethers.Contract,
-            pool: hre.ethers.Contract
-        ) => {
-            const wethAmount = hre.ethers.parseUnits('0.1', 'ether')
-            await weth.deposit({ value: wethAmount })
-            await weth.approve(swapRouter, wethAmount)
-
-            await swapRouter.exactInputSingle({
-                tokenIn: wethAddress,
-                tokenOut: await token.getAddress(),
-                fee: await pool.fee(),
-                recipient: accounts[0].address,
-                deadline: Math.floor(new Date().getTime() / 1000) + 3600,
-                amountIn: wethAmount,
-                amountOutMinimum: 0,
-                sqrtPriceLimitX96: 0
-            })
-
-            console.log('exact input single complete')
-            const tokenAmount = await token.balanceOf(accounts[0].address)
-            console.log('approving', tokenAmount)
-            await token.approve(nfpmAddress, 0)
-            await token.approve(nfpmAddress, tokenAmount)
-            console.log('depositing weth')
-            await weth.deposit({ value: wethAmount })
-            console.log('approving weth')
-            await weth.approve(nfpmAddress, wethAmount)
-            console.log('=========================')
-            console.log('tokenamount:', tokenAmount)
-            console.log('wethamount', wethAmount)
-            console.log('=========================')
-            console.log('attempting to mint position')
-            const tickSpacing = Number(await pool.tickSpacing())
-            const minttx = await nfpm.mint({
-                token0: await pool.token0(),
-                token1: await pool.token1(),
-                fee: await pool.fee(),
-                tickLower: Math.ceil(-887272 / tickSpacing) * tickSpacing,
-                tickUpper: Math.floor(887272 / tickSpacing) * tickSpacing,
-                amount0Desired: await pool.token0() == wethAddress ? wethAmount : tokenAmount,
-                amount1Desired: await pool.token1() == wethAddress ? tokenAmount : wethAmount,
-                amount0Min: 0,
-                amount1Min: 0,
-                recipient: await mimisbrunnr.getAddress(),
-                deadline: Math.floor(new Date().getTime() / 1000) + 3600
-            })
-            await minttx.wait()
-            console.log('mint complete')
-            const filter = nfpm.filters.Transfer()
-            const events = await nfpm.queryFilter(
-                filter,
-                (await hre.ethers.provider.getBlockNumber()) - 1,
-                (await hre.ethers.provider.getBlockNumber())
-            )
-
-            await mimisbrunnr.setMimisPositionForToken(await token.getAddress(), events[0].args[2])
-            console.log('position set')
-            expect((await nfpm.ownerOf(events[0].args[2])).toString()).to.equal(await mimisbrunnr.getAddress())
-            expect((await mimisbrunnr.pools(await token.getAddress())).mimisPosition).to.equal(events[0].args[2])
-
+        for await (const artifact of artifactsArray) {
+            const positionId = await createMimisPosition(artifact, 1, accounts[0])
+            expect((await nfpm.ownerOf(positionId)).toString()).to.equal(await mimisbrunnr.getAddress())
+            expect((await mimisbrunnr.pools(artifact.address)).mimisPosition).to.equal(positionId)
         }
-        console.log('1:grow')
-        await createMimisPosition(grow, growWethPool)
-        console.log('2:hair')
-        await createMimisPosition(hair, hairWethPool)
-        console.log('3:vita')
-        await createMimisPosition(vita, vitaWethPool)
-        console.log('4:rsc')
-        await createMimisPosition(rsc, rscWethPool)
-        console.log('5:lake')
-        await createMimisPosition(lake, lakeWethPool)
-        console.log('6')
 
         const totalProtocolLiquidity = await mimisbrunnr.totalProtocolOwnedLiquidity()
         const totalSupply = await mimisbrunnr.totalSupply()
@@ -278,60 +212,9 @@ describe("Mimisbrunnr", async () => {
         expect(totalProtocolLiquidity).to.be.equal(totalSupply)
     })
     it("should accept a RSC WETH Liquidity position", async () => {
-        const wethAmount = hre.ethers.parseUnits('0.1', 'ether')
-        const wethtx = await weth.deposit({ value: wethAmount })
-        await wethtx.wait()
-        const wethtx2 = await weth.deposit({ value: wethAmount })
-        await wethtx2.wait()
-        const approvetx = await weth.approve(swapAddress, wethAmount)
-        await approvetx.wait()
 
-        const swapForRsc = await swapRouter.exactInputSingle({
-            tokenIn: wethAddress,
-            tokenOut: rscAddress,
-            fee: 10000,
-            recipient: accounts[0].address,
-            deadline: Math.floor(new Date().getTime() / 1000) + 3600,
-            amountIn: wethAmount,
-            amountOutMinimum: 0,
-            sqrtPriceLimitX96: 0
-        })
-        await swapForRsc.wait()
-        const rscBalance = await rsc.balanceOf(accounts[0].address)
-        const rscallowance = await rsc.allowance(accounts[0].address, nfpmAddress)
-        await rsc.approve(nfpmAddress, 0n)
-        const approvetx3 = await rsc.approve(nfpmAddress, rscBalance)
-        await approvetx3.wait()
-        const wethtx3 = await weth.deposit({ value: wethAmount })
-        const approvetx4 = await weth.approve(nfpmAddress, wethAmount)
-        await approvetx4.wait()
-        const tickSpacing = Number(await rscWethPool.tickSpacing())
-        const minttx = await nfpm.mint({
-            token0: await rscWethPool.token0(),
-            token1: await rscWethPool.token1(),
-            fee: await rscWethPool.fee(),
-            tickLower: Math.ceil(-887272 / tickSpacing) * tickSpacing,
-            tickUpper: Math.floor(887272 / tickSpacing) * tickSpacing,
-            amount0Desired: wethAmount,
-            amount1Desired: await rsc.balanceOf(accounts[0]),
-            amount0Min: 0,
-            amount1Min: 0,
-            recipient: accounts[0].address,
-            deadline: Math.floor(new Date().getTime() / 1000) + 3600
-        })
-        await minttx.wait()
-
-        const filterTransfer = nfpm.filters.Transfer()
-        const eventsTransfer = await nfpm.queryFilter(
-            filterTransfer,
-            (await hre.ethers.provider.getBlockNumber()) - 1,
-            (await hre.ethers.provider.getBlockNumber())
-        )
-
-        const approvetx5 = await nfpm.approve(await mimisbrunnr.getAddress(), eventsTransfer[0].args[2])
-        await approvetx5.wait()
-        const selltx = await mimisbrunnr.sellLP(eventsTransfer[0].args[2])
-        await selltx.wait()
+        await swapForDesciToken(ARTIFACTS.RSC, 1, accounts[0])
+        await mintMimis(ARTIFACTS.RSC, 1, accounts[0])
 
         const totalSupply = await mimisbrunnr.totalSupply()
         const totalProtocolLiquidity = await mimisbrunnr.totalProtocolOwnedLiquidity()
@@ -349,29 +232,7 @@ describe("Mimisbrunnr", async () => {
 
     it("should unwrap mims", async () => {
         const mimBalance = await mimisbrunnr.balanceOf(accounts[0].address)
-        console.log('============balances user ===========')
-        console.log('mims', await mimisbrunnr.balanceOf(accounts[0]))
-        console.log('weth', await weth.balanceOf(accounts[0]))
-        console.log('rsc', await rsc.balanceOf(accounts[0]))
-        console.log('grow', await grow.balanceOf(accounts[0]))
-        console.log('lake', await lake.balanceOf(accounts[0]))
-        console.log('vita', await vita.balanceOf(accounts[0]))
-        console.log('hair', await hair.balanceOf(accounts[0]))
-        console.log('=========poolLiqidity==============')
-        console.log('rsc', await mimisbrunnr.pools(rscAddress))
-        console.log('grow', await mimisbrunnr.pools(growAddress))
-        console.log('lake', await mimisbrunnr.pools(lakeAddress))
-        console.log('vita', await mimisbrunnr.pools(vitaAddress))
-        console.log('hair', await mimisbrunnr.pools(hairAddress))
-        console.log('=======================')
         const unwraptx = await mimisbrunnr.unwrapMimis(mimBalance)
-        console.log(await mimisbrunnr.balanceOf(accounts[0].address))
-        console.log('=======================')
-        console.log('mims', await mimisbrunnr.balanceOf(accounts[0]))
-        console.log('weth', await weth.balanceOf(accounts[0]))
-        console.log('rsc', await rsc.balanceOf(accounts[0]))
-        console.log('grow', await grow.balanceOf(accounts[0]))
-        console.log('=======================')
 
         const totalSupply = await mimisbrunnr.totalSupply()
         const totalProtocolLiquidity = await mimisbrunnr.totalProtocolOwnedLiquidity()
@@ -381,16 +242,16 @@ describe("Mimisbrunnr", async () => {
         const vitaLiquidity = (await mimisbrunnr.pools(await vita.getAddress())).protocolOwnedLiquidity
         const lakeLiquidity = (await mimisbrunnr.pools(await lake.getAddress())).protocolOwnedLiquidity
         expect(rscLiquidity + growLiquidity + hairLiquidity + vitaLiquidity + lakeLiquidity).to.equal(totalProtocolLiquidity)
-        expect(totalProtocolLiquidity).to.be.equal(totalSupply + 4n)
+        expect(totalProtocolLiquidity).to.be.equal(totalSupply + 2n)
     })
 
     it("mint some mimis for initial liquidity", async () => {
 
-        await zapMimis(rsc, rscWethPool, 10, accounts[0])
-        await zapMimis(grow, growWethPool, 10, accounts[0])
-        await zapMimis(hair, hairWethPool, 10, accounts[0])
-        await zapMimis(vita, vitaWethPool, 10, accounts[0])
-        await zapMimis(lake, lakeWethPool, 10, accounts[0])
+        for await (const artifact of artifactsArray) {
+            await swapForDesciToken(artifact, 1, accounts[0])
+            await mintMimis(artifact, 1, accounts[0])
+            await mintMimisLP(artifact, 1, accounts[0])
+        }
 
         const totalSupply = await mimisbrunnr.totalSupply()
         const totalProtocolLiquidity = await mimisbrunnr.totalProtocolOwnedLiquidity()
@@ -400,7 +261,7 @@ describe("Mimisbrunnr", async () => {
         const vitaLiquidity = (await mimisbrunnr.pools(await vita.getAddress())).protocolOwnedLiquidity
         const lakeLiquidity = (await mimisbrunnr.pools(await lake.getAddress())).protocolOwnedLiquidity
         expect(rscLiquidity + growLiquidity + hairLiquidity + vitaLiquidity + lakeLiquidity).to.equal(totalProtocolLiquidity)
-        expect(totalProtocolLiquidity).to.be.equal(totalSupply + 4n)
+        expect(totalProtocolLiquidity).to.be.equal(totalSupply + 2n)
 
 
         const liquidity = await mimisWethPool.liquidity()
@@ -409,76 +270,24 @@ describe("Mimisbrunnr", async () => {
     })
 
 
-    it("should provide initial liquidity", async () => {
-        const initialTokenAmount = await hre.ethers.parseUnits('10', 'ether')
-        console.log('weth', await weth.balanceOf(accounts[0]))
-        const depositWethtx = await weth.deposit({ value: initialTokenAmount })
-        await depositWethtx.wait()
-
-        const wethApprovetx = await weth.approve(
-            await nfpm.getAddress(),
-            initialTokenAmount
-        )
-        await wethApprovetx.wait()
-        const mimisbrunnrApproveTx = await mimisbrunnr.approve(
-            await nfpm.getAddress(),
-            initialTokenAmount
-        )
-        await mimisbrunnrApproveTx.wait()
-        const token0 = await mimisWethPool.token0()
-        const minttx = await nfpm.mint({
-            token0: await mimisWethPool.token0(),
-            token1: await mimisWethPool.token1(),
-            fee: await mimisWethPool.fee(),
-            tickLower: Math.ceil(-887272 / 200) * 200,
-            tickUpper: Math.floor(887272 / 200) * 200,
-            amount0Desired: (token0 === await mimisbrunnr.getAddress() ? await mimisbrunnr.balanceOf(accounts[0].address) : initialTokenAmount),
-            amount1Desired: (token0 !== await mimisbrunnr.getAddress() ? await mimisbrunnr.balanceOf(accounts[0].address) : initialTokenAmount),
-            amount0Min: 0,
-            amount1Min: 0,
-            recipient: accounts[0].address,
-            deadline: Math.floor(new Date().getTime() / 1000) + 3600
-        })
-        await minttx.wait()
-
-        const liquidity = await mimisWethPool.liquidity()
-        console.log('mimisWeth Liquidity', liquidity)
-        const filterTransfer = nfpm.filters.Transfer()
-        const eventsTransfer = await nfpm.queryFilter(
-            filterTransfer,
-            (await hre.ethers.provider.getBlockNumber()) - 1,
-            (await hre.ethers.provider.getBlockNumber())
-        )
-        nftIdToUnstake = eventsTransfer[0].args[2]
-        console.log('position', await nfpm.positions(nftIdToUnstake))
-        console.log('mimis addr', await mimisbrunnr.getAddress())
-        console.log('mimisWethAddr', await mimisWethPool.getAddress())
-        console.log('params', accounts[0].address, await staker.getAddress(), nftIdToUnstake)
+    it("stake a MIMIS/WETH position", async () => {
+        await swapForDesciToken(ARTIFACTS.RSC, 1, accounts[0])
+        await mintMimis(ARTIFACTS.RSC, 1, accounts[0])
+        nftIdToUnstake = await mintMimisLP(ARTIFACTS.RSC, 1, accounts[0])
         await nfpm["safeTransferFrom(address,address,uint256,bytes)"](accounts[0].address, await staker.getAddress(), nftIdToUnstake, "0x00")
     })
 
     it("conducts swap party to generate tx fees and advance the block time", async () => {
 
         const swapParty = async (account) => {
-            for await (const { token, pool } of tokenArray) {
-                const wethAmount = hre.ethers.parseUnits('1', 'ether')
-                await (await weth.connect(account).deposit({ value: wethAmount })).wait()
-                await weth.connect(account).approve(await swapRouter.getAddress(), wethAmount)
-                //console.log('weth swap approve', await weth.allowance(account.address, swapRouter.address))
-                const swap = await swapRouter.connect(account).exactInputSingle({
-                    tokenIn: wethAddress,
-                    tokenOut: await token.getAddress(),
-                    fee: await pool.fee(),
-                    recipient: account.address,
-                    deadline: Math.floor(new Date().getTime() / 1000) + 3600,
-                    amountIn: wethAmount,
-                    amountOutMinimum: 0,
-                    sqrtPriceLimitX96: 0
-                })
-                await swap.wait()
-                await (await token.connect(account).approve(await swapRouter.getAddress(), await token.balanceOf(account.address))).wait()
+            for await (const artifact of artifactsArray) {
+                const pool = new hre.ethers.Contract(artifact.poolAddr, poolAbi, account)
+                const token = new hre.ethers.Contract(artifact.address, artifact.abi, account)
+                await swapForDesciToken(artifact, 1, account)
+
+                await (await token.approve(await swapRouter.getAddress(), await token.balanceOf(account.address))).wait()
                 const swapBack = await swapRouter.connect(account).exactInputSingle({
-                    tokenIn: await token.getAddress(),
+                    tokenIn: artifact.address,
                     tokenOut: wethAddress,
                     fee: await pool.fee(),
                     recipient: account.address,
@@ -488,10 +297,8 @@ describe("Mimisbrunnr", async () => {
                     sqrtPriceLimitX96: 0
                 })
                 await swapBack.wait()
-                await zapMimis(token, pool, 1, account)
-
+                await mintMimis(artifact, 0.5, account)
                 await hre.network.provider.send("evm_increaseTime", [3600 * 2])
-
             }
         }
         console.log('/********************************/')

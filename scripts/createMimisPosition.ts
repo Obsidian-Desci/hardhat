@@ -9,7 +9,7 @@ export async function main() {
   const signers = await hre.ethers.getSigners();
 
   await createMimisPosition(ARTIFACTS.LAKE, 0.001, signers[0])
-
+}
 // We recommend this pattern to be able to use async/await everywhere
 // and properly handle errors.
 main().catch((error) => {

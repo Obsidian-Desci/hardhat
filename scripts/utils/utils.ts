@@ -59,22 +59,26 @@ export const mintMimis = async (
     const pool = new ethers.Contract(artifact.poolAddr, poolAbi, account)
 
     const wethWei = ethers.parseUnits(String(amountWeth), 'ether')
-
     const currentWethBalance = await weth.balanceOf(account.address)
     if (currentWethBalance < wethWei) {
+    console.log('depositing weth')
     await (await weth.deposit({ value: wethWei })).wait()
     }
     const tokenAmount = await token.balanceOf(account.address)
 
     const wethApprovalForNfpm = await weth.allowance(account.address, await nfpm.getAddress())
     if (wethApprovalForNfpm <= wethWei) {
+    console.log('approving weth')
     await (await weth.approve(await nfpm.getAddress(), wethWei * 2n)).wait()
     }
 
     const tokenApprovalForNfpm = await token.allowance(account.address, await nfpm.getAddress())
     if (tokenApprovalForNfpm <= tokenAmount) {
+    console.log('approving token')
+    await (await token.approve(await nfpm.getAddress(), 0)).wait()
     await (await token.approve(await nfpm.getAddress(), tokenAmount * 2n)).wait()
     }
+    console.log('minting')
     const tickSpacing = Number(await pool.tickSpacing())
     const nfpmtx = await nfpm.mint({
         token0: await pool.token0(),
@@ -110,6 +114,7 @@ export const mintMimis = async (
     console.log(events[0].args[2])
     if (initialPosition) {
         await mimisbrunnr.setMimisPositionForToken(artifact.address, events[0].args[2])
+        return events[0].args[2]
     } else {
         await (await nfpm.approve(await mimisbrunnr.getAddress(), events[0].args[2])).wait()
         console.log('approve complete')
@@ -187,5 +192,6 @@ export const createMimisPosition = async (
     account: ethers.Signer
 ) => {
     await swapForDesciToken(artifact, wethAmount, account)
-    await mintMimis(artifact, wethAmount, account, true)
+    const tokenId = await mintMimis(artifact, wethAmount, account, true)
+    return tokenId
 }
