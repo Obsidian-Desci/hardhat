@@ -55,6 +55,14 @@ export async function main() {
       console.log(err)
     }
   });
+  fs.writeFile('../mimisbrunnr/src/assets/abi/MimisbrunnrV2.json', JSON.stringify({
+    address: await mimisbrunnr.getAddress(),
+    abi:MimisBrunnr.abi
+  }), (err) => {
+    if (err) {
+      console.log(err)
+    }
+  });
   fs.writeFile('./abi/Staker.json', JSON.stringify({
     address: await staker.getAddress(),
     abi:Staker.abi
@@ -63,7 +71,23 @@ export async function main() {
       console.log(err)
     }
   });
+  fs.writeFile('../mimisbrunnr/src/assets/abi/Staker.json', JSON.stringify({
+    address: await staker.getAddress(),
+    abi:Staker.abi
+  }), (err) => {
+    if (err) {
+      console.log(err)
+    }
+  });
   fs.writeFile('./abi/MIMISWETHPool.json', JSON.stringify({
+    address: poolAddr,
+    abi: poolAbi
+  }), (err) => {
+    if (err) {
+      console.log(err)
+    }
+  });
+  fs.writeFile('../mimisbrunnr/src/assets/abi/MIMISWETHPool.json', JSON.stringify({
     address: poolAddr,
     abi: poolAbi
   }), (err) => {
