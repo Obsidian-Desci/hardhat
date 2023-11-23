@@ -237,8 +237,8 @@ contract Staker is IStaker {
 
     function transferDeposit(uint256 tokenId, address to) external override {
         require(to != address(0), 'UniswapV3Staker::transferDeposit: invalid transfer recipient');
-        address owner = deposits[tokenId].owner;
-        require(owner == msg.sender, 'UniswapV3Staker::transferDeposit: can only be called by deposit owner');
+        address depositOwner = deposits[tokenId].owner;
+        require(depositOwner == msg.sender, 'UniswapV3Staker::transferDeposit: can only be called by deposit owner');
         deposits[tokenId].owner = to;
         emit DepositTransferred(tokenId, owner, to);
     }

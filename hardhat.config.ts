@@ -37,7 +37,7 @@ const config: HardhatUserConfig = {
       }
     },
     lilypad: {
-      url: "http://testnet.lilypadnetwork.org:8545",
+      url: "http://testnet.lilypad.tech:8545",
       chainId: 1337,
       accounts: {
         mnemonic: process.env.MNEMONIC || ''

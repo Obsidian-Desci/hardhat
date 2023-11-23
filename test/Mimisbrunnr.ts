@@ -370,6 +370,12 @@ describe("Mimisbrunnr", async () => {
         )
         console.log('rewardInfo', rewardInfo)
         */
+       const rscBalance = await rsc.balanceOf(accounts[0].address)
+       const growBalance = await grow.balanceOf(accounts[0].address)
+       const hairBalance = await hair.balanceOf(accounts[0].address)
+       const vitaBalance = await vita.balanceOf(accounts[0].address)
+       const lakeBalance = await lake.balanceOf(accounts[0].address)
+       const wethBalance = await weth.balanceOf(accounts[0].address)
 
         await (await staker.unstakeToken(nftIdToUnstake)).wait()
 
@@ -377,6 +383,12 @@ describe("Mimisbrunnr", async () => {
             accounts[0].address,
         )).wait()
 
+        expect(await rsc.balanceOf(accounts[0].address)).to.greaterThan(rscBalance)
+        expect(await grow.balanceOf(accounts[0].address)).to.greaterThan(growBalance)
+        expect(await hair.balanceOf(accounts[0].address)).to.greaterThan(hairBalance)
+        expect(await vita.balanceOf(accounts[0].address)).to.greaterThan(vitaBalance)
+        expect(await lake.balanceOf(accounts[0].address)).to.greaterThan(lakeBalance)
+        expect(await weth.balanceOf(accounts[0].address)).to.greaterThan(wethBalance)
 
         /*
         */

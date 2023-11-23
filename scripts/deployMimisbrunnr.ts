@@ -8,12 +8,31 @@ import { address as wethAddress, abi as wethAbi } from "../abi/WETH.json"
 
 export async function main() {
   const signers = await hre.ethers.getSigners();
+  console.log('deploying mimisbrunnr')
   const mimisbrunnr = await hre.ethers.deployContract(
     "Mimisbrunnr", []
     );
-
   await mimisbrunnr.waitForDeployment();
   const mimisaddr = await mimisbrunnr.getAddress()
+
+  fs.writeFile('./abi/MimisbrunnrV2.json', JSON.stringify({
+    address: await mimisbrunnr.getAddress(),
+    abi:MimisBrunnr.abi
+  }), (err) => {
+    if (err) {
+      console.log(err)
+    }
+  });
+  fs.writeFile('../mimisbrunnr/src/assets/abi/MimisbrunnrV2.json', JSON.stringify({
+    address: await mimisbrunnr.getAddress(),
+    abi:MimisBrunnr.abi
+  }), (err) => {
+    if (err) {
+      console.log(err)
+    }
+  });
+  /*
+  console.log('mimibrunnr addr', await mimisbrunnr.getAddress())
 
   const factory = new hre.ethers.Contract(
     factoryAddress,
@@ -28,7 +47,7 @@ export async function main() {
   )
   await pooltx.wait()
 
-  const sqrtPriceX96 = 1n * 2n ** 96n
+  const sqrtPriceX96 = 0.00035n * 2n ** 96n
   const poolAddr = await factory.getPool(
       mimisaddr,
       wethAddress,
@@ -100,7 +119,7 @@ export async function main() {
     stakerAddr: await staker.getAddress(),
     poolAddr: poolAddr
   }
- 
+*/ 
 }
 
 // We recommend this pattern to be able to use async/await everywhere

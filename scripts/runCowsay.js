@@ -3,9 +3,9 @@ const hre = require('hardhat')
 const clientLilypadAddr = process.env.CLIENT_ADDR
 
 async function main() {
-    const exampleClient = await hre.ethers.getContractAt("ExampleClient", clientLilypadAddr)
-    const cowsay = await exampleClient.runCowsay('hello cowsay from hardhat', {
-        value: hre.ethers.parseUnits('2', 'ether')
+    const lilypadClient = await hre.ethers.getContractAt("LilypadClient", clientLilypadAddr)
+    const cowsay = await lilypadClient.runCowsay('hello cowsay from hardhat', {
+        //value: hre.ethers.parseUnits('2', 'ether')
     })
     console.log(cowsay)
 }
